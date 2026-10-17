@@ -17,12 +17,14 @@ export function sambutan(store) {
         `Halo! 👋 Selamat datang di *${store.name}*`,
         store.tagline ? `_${store.tagline}_` : null,
         '',
-        'Saya bot yang bisa bantu kamu:',
-        '• *list* — lihat katalog produk',
-        '• *status* — cek pesanan & isi akun',
-        '• *bantuan* — hubungi admin',
+        'Cara pesan:',
+        '1. Ketik *list*',
+        '2. Balas *nomor* produk',
+        '3. Balas *nomor* paket',
+        '4. Bayar lewat QRIS yang dikirim',
+        '5. Kirim bukti transfer',
         '',
-        'Ketik *list* untuk mulai belanja 🛒',
+        'Ketik *list* untuk mulai 🛒',
     ]
         .filter((baris) => baris !== null)
         .join('\n')
@@ -43,20 +45,19 @@ export function bantuan(store) {
         '💬 *Bantuan*',
         GARIS,
         '',
-        '*Perintah yang tersedia:*',
-        '• *list* — daftar produk & harga',
-        '• *status* — cek status pesanan',
-        '• *batal* — batalkan proses yang sedang berjalan',
-        '• *bantuan* — tampilkan pesan ini',
-        '',
         '*Cara pesan:*',
-        '1. Ketik *list*',
+        '1. *list* — lihat katalog',
         '2. Balas *nomor* produk',
-        '3. Balas *nomor* varian',
-        '4. Isi data yang diminta',
-        '5. Bayar lewat QRIS',
+        '3. Balas *nomor* paket',
+        '4. Bayar lewat QRIS',
+        '5. Kirim bukti transfer',
         '',
-        '*Butuh bantuan lain?*',
+        '*Perintah lain:*',
+        '• *status* — cek pesanan',
+        '• *riwayat* — daftar pesanan Anda',
+        '• *batal* — batalkan proses',
+        '',
+        '*Butuh bantuan?*',
         `Chat admin: wa.me/${store.whatsapp}`,
     ].join('\n');
 }
@@ -67,12 +68,7 @@ export function bantuan(store) {
  * @param {Array<{name: string, products: Array}>} categories
  */
 export function katalog(store, categories) {
-    const baris = [
-        `🛍️ *${store.name}*`,
-        GARIS,
-        '',
-    ];
-
+    const baris = [`🛍️ *${store.name}*`, GARIS, ''];
     let nomor = 0;
 
     for (const kategori of categories) {
@@ -92,27 +88,18 @@ export function katalog(store, categories) {
         baris.push('');
     }
 
-    baris.push(
-        'Ketik *nomor* produk untuk lihat detail.',
-        'Contoh: *1*',
-        '',
-        `Butuh bantuan? Ketik *bantuan*`,
-    );
+    baris.push('Ketik *nomor* produk untuk lihat paket.', 'Contoh: *1*');
 
     return baris.join('\n').trim();
 }
 
 /**
- * Detail satu produk + daftar varian.
+ * Detail satu produk + daftar paket.
  * @param {object} produk
  * @param {Array} varian
  */
 export function detailProduk(produk, varian) {
-    const baris = [
-        `📦 *${escapeWa(produk.name)}*`,
-        GARIS,
-        '',
-    ];
+    const baris = [`📦 *${escapeWa(produk.name)}*`, GARIS, ''];
 
     if (produk.description) {
         baris.push(potong(escapeWa(produk.description), 300), '');
@@ -123,7 +110,7 @@ export function detailProduk(produk, varian) {
     }
 
     if (varian.length === 0) {
-        baris.push('⚠️ Belum ada varian tersedia.', '', 'Ketik *bantuan* untuk tanya admin.');
+        baris.push('⚠️ Belum ada paket tersedia.', '', 'Ketik *bantuan* untuk tanya admin.');
         return baris.join('\n').trim();
     }
 
@@ -151,7 +138,7 @@ export function detailProduk(produk, varian) {
 }
 
 /**
- * Ringkasan pesanan setelah dibuat.
+ * Ringkasan pesanan setelah dibuat + instruksi bayar.
  */
 export function pesananDibuat(pesanan, pembayaran, store) {
     const baris = [
@@ -159,7 +146,6 @@ export function pesananDibuat(pesanan, pembayaran, store) {
         GARIS,
         '',
         `🧾 Invoice: *${pesanan.invoice}*`,
-        `👤 Nama: ${pesanan.buyer_name}`,
         '',
         '*Rincian:*',
     ];
@@ -169,23 +155,12 @@ export function pesananDibuat(pesanan, pembayaran, store) {
         baris.push(`   ${item.qty} × ${rupiah(item.subtotal / item.qty)} = ${rupiah(item.subtotal)}`);
     }
 
-    baris.push(
-        '',
-        `💰 *Total: ${rupiah(pesanan.total)}*`,
-        '',
-        GARIS,
-        '',
-        '💳 *Cara bayar:*',
-    );
+    baris.push('', `💰 *Total: ${rupiah(pesanan.total)}*`, '', GARIS, '', '💳 *Cara bayar:*');
 
     if (pembayaran.qris_url) {
         baris.push('Scan QRIS yang saya kirim setelah pesan ini.');
-
-        if (pembayaran.holder) {
-            baris.push(`Atas nama: ${pembayaran.holder}`);
-        }
-
-        baris.push('', 'Setelah bayar, kirim bukti transfer ke admin.');
+        if (pembayaran.holder) baris.push(`Atas nama: ${pembayaran.holder}`);
+        baris.push('', 'Bayar sesuai total di atas.');
     } else {
         baris.push(
             'QRIS belum tersedia. Hubungi admin untuk instruksi pembayaran:',
@@ -194,15 +169,68 @@ export function pesananDibuat(pesanan, pembayaran, store) {
     }
 
     if (pesanan.expires_at) {
-        const batas = new Date(pesanan.expires_at);
-        const menit = Math.max(0, Math.round((batas - Date.now()) / 60000));
+        const menit = Math.max(0, Math.round((new Date(pesanan.expires_at) - Date.now()) / 60000));
         baris.push('', `⏳ Bayar dalam *${menit} menit* atau pesanan dibatalkan otomatis.`);
     }
 
     baris.push(
         '',
-        'Ketik *status* lalu kirim nomor invoice untuk cek pesanan.',
+        GARIS,
+        '',
+        '📸 *Setelah bayar,* kirim bukti transfer ke chat ini.',
+        'Admin akan memverifikasi, lalu isi akun Anda dikirim otomatis.',
     );
+
+    return baris.join('\n').trim();
+}
+
+/** Konfirmasi bukti transfer diterima. */
+export function buktiDiterima(adaPesanan) {
+    if (!adaPesanan) {
+        return [
+            '📸 Terima kasih atas buktinya.',
+            '',
+            'Namun saya tidak menemukan pesanan yang menunggu pembayaran dari nomor ini.',
+            '',
+            'Ketik *riwayat* untuk melihat pesanan Anda.',
+        ].join('\n');
+    }
+
+    return [
+        '📸 *Bukti transfer diterima!*',
+        '',
+        'Pesanan Anda sedang diverifikasi admin.',
+        'Isi akun akan dikirim otomatis begitu pembayaran dinyatakan lunas.',
+        '',
+        'Terima kasih 🙏',
+    ].join('\n');
+}
+
+/**
+ * Isi akun setelah pesanan selesai (dikirim otomatis oleh poller).
+ */
+export function pesananSelesai(pesanan, isi) {
+    const baris = [
+        '🎉 *Pesanan selesai!*',
+        GARIS,
+        '',
+        `🧾 *${pesanan.invoice}*`,
+        `Status: *${pesanan.status_label}*`,
+        '',
+        '🔑 *Isi akun Anda:*',
+        '',
+    ];
+
+    for (const grup of isi) {
+        baris.push(`*${grup.product_name} — ${grup.variant_name}*`);
+        for (const konten of grup.contents) {
+            baris.push('```', konten, '```');
+        }
+        baris.push('');
+    }
+
+    baris.push('⚠️ Jangan bagikan isi akun ini ke siapa pun.');
+    baris.push('', 'Ketik *list* untuk pesan lagi. 🙏');
 
     return baris.join('\n').trim();
 }
@@ -227,7 +255,7 @@ export function statusPesanan(pesanan, isi) {
     }
 
     if (isi && isi.length > 0) {
-        baris.push('', GARIS, '', '🔑 *Isi pesanan Anda:*', '');
+        baris.push('', GARIS, '', '🔑 *Isi akun Anda:*', '');
 
         for (const grup of isi) {
             baris.push(`*${grup.product_name} — ${grup.variant_name}*`);
@@ -249,30 +277,20 @@ export function statusPesanan(pesanan, isi) {
     return baris.join('\n').trim();
 }
 
-/**
- * Riwayat pesanan satu nomor.
- */
+/** Riwayat pesanan satu nomor. */
 export function riwayatPesanan(daftar) {
     if (daftar.length === 0) {
-        return [
-            'Belum ada pesanan dari nomor ini.',
-            '',
-            'Ketik *list* untuk mulai belanja.',
-        ].join('\n');
+        return ['Belum ada pesanan dari nomor ini.', '', 'Ketik *list* untuk mulai belanja.'].join('\n');
     }
 
     const baris = ['📋 *Riwayat pesanan Anda*', GARIS, ''];
 
     for (const p of daftar) {
-        baris.push(
-            `🧾 *${p.invoice}*`,
-            `${p.payment_label} • ${rupiah(p.total)}`,
-            `_${p.status_label}_`,
-            '',
-        );
+        baris.push(`🧾 *${p.invoice}*`, `${p.payment_label} • ${rupiah(p.total)}`, `_${p.status_label}_`, '');
     }
 
     baris.push('Ketik nomor invoice untuk lihat detail & isi akun.');
+
     return baris.join('\n').trim();
 }
 
@@ -289,70 +307,38 @@ export function mintaDataWajib(produk, varian, label) {
         baris.push(`${i + 1}. ${l}`);
     });
 
-    baris.push(
-        '',
-        'Kirim dalam *satu pesan*, dipisah baris baru.',
-        'Contoh:',
-        label.map((l, i) => `<${l.toLowerCase()}>`).join('\n'),
-    );
+    baris.push('', 'Kirim dalam *satu pesan*, dipisah baris baru.');
 
     return baris.join('\n').trim();
 }
 
-/** Permintaan nama pembeli. */
-export function mintaNama(produk, varian) {
+/** Data wajib kurang lengkap. */
+export function dataKurang(label, jumlah) {
     return [
-        `📝 *${produk.name} — ${varian.name}*`,
-        `${rupiah(varian.price)}`,
+        `❌ Butuh ${label.length} data, Anda mengirim ${jumlah}.`,
         '',
-        'Siapa nama Anda? (untuk invoice)',
+        'Kirim ulang, satu data per baris:',
+        ...label.map((l, i) => `${i + 1}. ${l}`),
     ].join('\n');
 }
 
-/** Konfirmasi sebelum pesanan dibuat. */
-export function konfirmasiPesanan(produk, varian, nama, data) {
-    const baris = [
-        '🛒 *Konfirmasi pesanan*',
-        GARIS,
+/** Paket habis. */
+export function varianHabis(nama) {
+    return [
+        `❌ *${nama}* sedang tidak tersedia.`,
         '',
-        `Produk: ${produk.name}`,
-        `Paket: ${varian.name}`,
-        `Harga: ${rupiah(varian.price)}`,
-        `Nama: ${nama}`,
-    ];
-
-    const entri = Object.entries(data || {});
-    if (entri.length > 0) {
-        baris.push('');
-        for (const [k, v] of entri) {
-            baris.push(`${k}: ${v}`);
-        }
-    }
-
-    baris.push(
-        '',
-        'Ketik *ya* untuk buat pesanan, atau *batal* untuk membatalkan.',
-    );
-
-    return baris.join('\n').trim();
+        'Pilih paket lain, atau ketik *bantuan* untuk tanya admin.',
+    ].join('\n');
 }
 
-/** Pesan ketika produk/varian tidak ditemukan. */
+/** Produk tidak ditemukan. */
 export function tidakDitemukan(kata) {
-    return [
-        `❌ Produk "${potong(kata, 40)}" tidak ditemukan.`,
-        '',
-        'Ketik *list* untuk lihat semua produk.',
-    ].join('\n');
+    return [`❌ Produk "${potong(kata, 40)}" tidak ditemukan.`, '', 'Ketik *list* untuk lihat semua produk.'].join('\n');
 }
 
 /** Nomor di luar jangkauan pilihan produk. */
 export function nomorSalah(maks) {
-    return [
-        `❌ Nomor tidak ada. Pilih antara 1 sampai ${maks}.`,
-        '',
-        'Ketik *list* untuk lihat daftar.',
-    ].join('\n');
+    return [`❌ Nomor tidak ada. Pilih antara 1 sampai ${maks}.`, '', 'Ketik *list* untuk lihat daftar.'].join('\n');
 }
 
 /** Nomor di luar jangkauan paket pada layar detail produk. */
@@ -364,25 +350,29 @@ export function nomorVarianSalah(maks) {
     ].join('\n');
 }
 
-/** Pesan ketika pengguna terlalu banyak mengirim pesan. */
+/** Terlalu banyak pesan. */
 export function terlaluCepat(detik) {
     return `⏳ Terlalu banyak pesan. Coba lagi dalam ${detik} detik.`;
 }
 
-/** Bot sedang sibuk / gangguan sementara. */
-export function gangguan() {
-    return [
-        '⚠️ Maaf, layanan sedang gangguan.',
-        '',
-        'Coba lagi beberapa saat, atau hubungi admin langsung.',
-    ].join('\n');
+/** Gangguan sementara. */
+export function gangguan(pesan) {
+    return ['⚠️ Maaf, layanan sedang gangguan.', '', pesan, '', 'Coba lagi beberapa saat, atau hubungi admin.'].join('\n');
 }
 
 /** Dibatalkan. */
 export function dibatalkan() {
+    return ['✅ Dibatalkan.', '', 'Ketik *list* untuk mulai lagi.'].join('\n');
+}
+
+/** Teks tak dikenal. */
+export function fallback() {
     return [
-        '✅ Dibatalkan.',
+        'Hmm, saya belum mengerti maksudnya. 🤔',
         '',
-        'Ketik *list* untuk mulai lagi.',
+        'Coba ketik:',
+        '• *list* — lihat katalog',
+        '• *status* — cek pesanan',
+        '• *bantuan* — hubungi admin',
     ].join('\n');
 }

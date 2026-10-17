@@ -1,12 +1,18 @@
 /**
- * Mesin percakapan bot.
+ * Mesin percakapan bot (versi sederhana).
  *
- * Menerima teks + identitas pengirim, mengembalikan daftar balasan. Tidak
- * menyentuh WhatsApp maupun Chrome, sehingga seluruh alur bisa diuji dengan
- * `npm test` tanpa scan QR.
+ * Alur yang diinginkan pembeli:
+ *   1. `list` -> pilih nomor produk -> pilih nomor paket
+ *   2. Bot langsung buat pesanan & kirim QRIS (tanpa tanya nama/konfirmasi)
+ *   3. Pembeli kirim bukti transfer -> bot kasih tahu sedang diverifikasi
+ *   4. Admin verifikasi di panel -> bot kirim isi akun (lihat poller di index.js)
+ *
+ * Yang dipakai hanya saat varian benar-benar butuh data (mis. "Email Canva").
+ *
+ * Tidak ada akses WhatsApp di sini: `index.js`/adapter yang mengirim pesan.
  */
 import { api, ApiError } from './api.js';
-import { normalisasiNomor, potong } from './format.js';
+import { normalisasiNomor } from './format.js';
 import { parsePesan } from './parser.js';
 import * as R from './replies.js';
 import { clearState, getState, setState, STATE } from './session.js';
@@ -18,6 +24,13 @@ let catalogCache = { at: 0, data: null };
 
 /** Penahan pesan per nomor (in-memory, murah). */
 const hits = new Map();
+
+/**
+ * Nomor pembeli per chat, dipakai poller untuk memberi tahu saat pesanan
+ * selesai. Disimpan di memori (bot sengaja tidak menyimpan state ke disk).
+ * @type {Map<string, string>}
+ */
+const nomorPerChat = new Map();
 
 function kenaRateLimit(nomor, batas) {
     const now = Date.now();
@@ -37,6 +50,11 @@ function kenaRateLimit(nomor, batas) {
 
 export function resetRateLimit(nomor) {
     hits.delete(nomor);
+}
+
+/** @returns {Array<{chatId: string, nomor: string}>} */
+export function nomorTerdaftar() {
+    return [...nomorPerChat.entries()].map(([chatId, nomor]) => ({ chatId, nomor }));
 }
 
 async function ambilKatalog(force = false) {
@@ -75,10 +93,7 @@ export function batasiKatalog(katalogData, maks) {
 
 /**
  * Daftar produk datar dengan urutan SAMA seperti yang dirender `katalog()`.
- * Nomor yang dilihat pembeli harus menunjuk produk yang sama di sini.
- *
- * Menerima objek katalog (`{categories}`) maupun array kategori hasil
- * `batasiKatalog()`.
+ * Menerima objek katalog (`{categories}`) maupun array kategori.
  */
 export function daftarProdukDatar(katalogData) {
     const kategori = Array.isArray(katalogData) ? katalogData : katalogData?.categories || [];
@@ -124,17 +139,41 @@ function formatPilihanProduk(hasil) {
     return baris.join('\n');
 }
 
+/** Kata kunci yang menandakan pembeli mengirim bukti transfer. */
+const KATA_BUKTI = ['bukti', 'transfer', 'sudah bayar', 'sudah transfer', 'sudah kirim', 'pembayaran', 'bayar', 'screenshot'];
+
+/** Perintah yang tetap dikenali saat bot sedang menunggu isian. */
+const PERINTAH_DARURAT = ['list', 'lanjut', 'status', 'riwayat', 'bantuan', 'batal'];
+
+function adalahPerintah(teks) {
+    const t = String(teks || '').trim().toLowerCase();
+
+    return PERINTAH_DARURAT.some((kata) => t === kata || t.startsWith(`${kata} `));
+}
+
+function isBukti(ctx, aksi) {
+    if (ctx.hasMedia) return true;
+
+    const teks = String(aksi.teks || '').toLowerCase();
+
+    if (KATA_BUKTI.some((kata) => teks.includes(kata))) return true;
+
+    // "tf" singkat: hanya cocok sebagai kata utuh, bukan di dalam "netflix".
+    return /(^|\s)tf(\s|$)/.test(teks);
+}
+
 /**
  * Titik masuk utama.
  *
  * @param {object} params
  * @param {string} params.teks isi pesan
- * @param {string} params.nomor nomor pengirim (62xxx)
+ * @param {string} params.nomor nomor pengirim (62xxx / LID)
  * @param {string} params.chatId id chat untuk kunci sesi
  * @param {number} [params.batasRate] batas pesan per menit
- * @returns {Promise<{replies: string[], state?: string}>}
- */
-export async function handlePesan({ teks, nomor, chatId, batasRate = 20 }) {
+ * @param {string} [params.nama] nama tampilan WhatsApp (dipakai untuk invoice)
+ * @param {boolean} [params.hasMedia] pesan membawa gambar (bukti transfer)
+ * */
+export async function handlePesan({ teks, nomor, chatId, batasRate = 20, nama = '', hasMedia = false }) {
     const nomorBersih = normalisasiNomor(nomor);
 
     const tunggu = kenaRateLimit(nomorBersih || chatId, batasRate);
@@ -142,11 +181,14 @@ export async function handlePesan({ teks, nomor, chatId, batasRate = 20 }) {
         return { replies: [R.terlaluCepat(tunggu)] };
     }
 
+    if (nomorBersih) nomorPerChat.set(chatId, nomorBersih);
+
     const aksi = parsePesan(teks);
     const state = getState(chatId);
+    const ctx = { nama, hasMedia, teks: String(teks || '') };
 
     try {
-        return await route(aksi, state, chatId, nomorBersih);
+        return await route(aksi, state, chatId, nomorBersih, ctx);
     } catch (e) {
         if (e instanceof ApiError) {
             // Pesan validasi dari Laravel (mis. stok habis) diteruskan apa adanya.
@@ -154,45 +196,16 @@ export async function handlePesan({ teks, nomor, chatId, batasRate = 20 }) {
                 return { replies: [`⚠️ ${e.message}`] };
             }
 
-            // Bot belum diaktifkan di Laravel, atau token tidak cocok: jangan
-            // diam saja — beri tahu pembeli agar tidak menunggu balasan kosong.
             if (e.status === 503) {
-                log.error(`API menolak: ${e.message}`);
-                return {
-                    replies: [
-                        [
-                            '⚠️ Bot sedang tidak aktif di server toko.',
-                            '',
-                            'Hubungi admin atau coba lagi nanti.',
-                        ].join('\\n'),
-                    ],
-                };
+                return { replies: [R.gangguan('bot belum aktif di server toko')] };
             }
 
             if (e.status === 401) {
-                log.error(`Token bot tidak valid: ${e.message}`);
-                return {
-                    replies: [
-                        [
-                            '⚠️ Bot tidak bisa menghubungi server toko.',
-                            '',
-                            'Admin perlu memeriksa konfigurasi bot.',
-                        ].join('\\n'),
-                    ],
-                };
+                return { replies: [R.gangguan('token bot tidak cocok')] };
             }
 
             if (e.status === 0) {
-                log.error(`Tidak bisa menghubungi server toko: ${e.message}`);
-                return {
-                    replies: [
-                        [
-                            '⚠️ Server toko tidak bisa dihubungi.',
-                            '',
-                            'Coba lagi beberapa saat, atau hubungi admin.',
-                        ].join('\\n'),
-                    ],
-                };
+                return { replies: [R.gangguan('server toko tidak bisa dihubungi')] };
             }
         }
 
@@ -200,7 +213,13 @@ export async function handlePesan({ teks, nomor, chatId, batasRate = 20 }) {
     }
 }
 
-async function route(aksi, state, chatId, nomor) {
+async function route(aksi, state, chatId, nomor, ctx) {
+    // ---------------------------------------------------------- bukti transfer
+    // Gambar selalu dianggap bukti transfer, apa pun teksnya (bisa kosong).
+    if (ctx.hasMedia) {
+        return buktiTransfer(nomor);
+    }
+
     // ---------------------------------------------------------------- global
     if (aksi.type === 'kosong') {
         return { replies: [R.bantuan(await infoToko())] };
@@ -211,8 +230,6 @@ async function route(aksi, state, chatId, nomor) {
         return { replies: [R.bantuan(await infoToko())] };
     }
 
-    // Sapaan pertama: sambutan singkat, bukan panduan penuh. Kalau pembeli
-    // menyapa di tengah alur, jangan sampai state pesanan ikut hilang.
     if (aksi.type === 'sapa') {
         if (state?.tahap) return { replies: [R.sapaanSingkat()] };
 
@@ -229,34 +246,16 @@ async function route(aksi, state, chatId, nomor) {
         return cekInvoice(aksi.invoice, nomor);
     }
 
-    // ------------------------------------------- state yang menunggu isian
-    // HARUS diperiksa sebelum cabang pencarian: saat menunggu nama, pembeli
-    // mengetik "Budi Santoso" — itu nama, bukan kata kunci katalog.
-    //
-    // TAPI perintah darurat tetap harus bisa keluar dari state: jangan pernah
-    // menjadikan "list"/"status"/"riwayat" sebagai nama pembeli atau data wajib.
-    const perintahDarurat = ['list', 'lanjut', 'status', 'riwayat'];
-    const sedangMenungguIsian = state?.tahap === STATE.NAMA || state?.tahap === STATE.DATA;
-    const keluarDariState = sedangMenungguIsian && perintahDarurat.includes(aksi.type);
-
-    if (keluarDariState) {
-        clearState(chatId);
+    // --------------------------------------------- state yang menunggu isian
+    // Saat menunggu data wajib, teks apa pun dianggap data — KECUALI perintah
+    // jelas seperti "status" atau "list" (pembeli mungkin berubah pikiran).
+    if (state?.tahap === STATE.DATA && !adalahPerintah(ctx.teks)) {
+        return terimaData(state, ctx.teks, chatId, nomor, ctx);
     }
 
-    if (!keluarDariState) {
-        switch (state?.tahap) {
-            case STATE.NAMA:
-                return terimaNama(state, String(aksi.teks ?? ''), chatId, nomor);
-
-            case STATE.DATA:
-                return terimaData(state, String(aksi.teks ?? ''), chatId, nomor);
-
-            case STATE.KONFIRMASI:
-                return terimaKonfirmasi(state, aksi, chatId, nomor);
-
-            default:
-                break;
-        }
+    // Perintah darurat tetap bisa keluar dari layar pilih produk.
+    if (state?.tahap === STATE.DETAIL && PERINTAH_DARURAT.includes(aksi.type)) {
+        clearState(chatId);
     }
 
     // ---------------------------------------------------------------- katalog
@@ -278,7 +277,7 @@ async function route(aksi, state, chatId, nomor) {
                     'Kirim nomor invoice Anda.',
                     'Contoh: *INV261017ABCDE*',
                     '',
-                    'Belum tahu nomornya? Ketik *riwayat* untuk lihat semua pesanan dari nomor ini.',
+                    'Belum tahu nomornya? Ketik *riwayat*.',
                 ].join('\n'),
             ],
         };
@@ -287,6 +286,12 @@ async function route(aksi, state, chatId, nomor) {
     if (aksi.type === 'riwayat') {
         const data = await api.orderHistory(nomor);
         return { replies: [R.riwayatPesanan(data.orders || [])] };
+    }
+
+    // ---------------------------------------------------------- bukti transfer
+    // Diperiksa sebelum pencarian: "sudah transfer" bukan nama produk.
+    if (isBukti(ctx, aksi)) {
+        return buktiTransfer(nomor);
     }
 
     // -------------------------------------------------------------- pencarian
@@ -303,7 +308,6 @@ async function route(aksi, state, chatId, nomor) {
             return bukaProduk(hasil[0].slug, chatId);
         }
 
-        // Simpan hasil supaya balasan angka berikutnya menunjuk daftar ini.
         setState(chatId, { tahap: STATE.PILIH_CARI, hasil: hasil.map((p) => p.slug) });
 
         return { replies: [formatPilihanProduk(hasil)] };
@@ -330,11 +334,11 @@ async function route(aksi, state, chatId, nomor) {
 
         case STATE.DETAIL:
             if (aksi.type === 'angka' || aksi.type === 'order_varian') {
-                return pilihVarian(state, aksi.nomor, chatId, nomor);
+                return pilihVarian(state, aksi.nomor, chatId, nomor, ctx);
             }
 
             if (aksi.type === 'order') {
-                return pilihVarian(state, 1, chatId, nomor);
+                return pilihVarian(state, 1, chatId, nomor, ctx);
             }
             break;
 
@@ -348,18 +352,7 @@ async function route(aksi, state, chatId, nomor) {
     }
 
     // ------------------------------------------------------------- fallback
-    return {
-        replies: [
-            [
-                'Hmm, saya belum mengerti maksudnya. 🤔',
-                '',
-                'Coba ketik:',
-                '• *list* — lihat katalog',
-                '• *status* — cek pesanan',
-                '• *bantuan* — hubungi admin',
-            ].join('\n'),
-        ],
-    };
+    return { replies: [R.fallback()] };
 }
 
 async function infoToko() {
@@ -369,8 +362,6 @@ async function infoToko() {
 
 async function pilihProdukNomor(nomorPilih, chatId) {
     const data = await ambilKatalog();
-    // Batas yang sama dengan `list`, kalau tidak nomor 25 bisa membuka produk
-    // yang tidak pernah ditampilkan ke pembeli.
     const daftar = daftarProdukDatar(batasiKatalog(data, config.batasProduk));
     const produk = daftar[nomorPilih - 1];
 
@@ -393,7 +384,14 @@ async function bukaProduk(slug, chatId) {
     return { replies: [R.detailProduk(data.product, data.variants)] };
 }
 
-async function pilihVarian(state, nomorVarian, chatId, nomor) {
+/**
+ * Paket dipilih -> pesanan langsung dibuat + QRIS dikirim.
+ *
+ * Tidak ada tanya nama/konfirmasi: nama diambil dari tampilan WhatsApp
+ * (fallback "Pembeli"), dan QRIS langsung dikirim. Hanya varian yang punya
+ * data wajib yang masih ditanya.
+ */
+async function pilihVarian(state, nomorVarian, chatId, nomor, ctx) {
     const varian = state.varian?.[nomorVarian - 1];
 
     if (!varian) {
@@ -401,55 +399,22 @@ async function pilihVarian(state, nomorVarian, chatId, nomor) {
     }
 
     if (!varian.purchasable) {
-        return {
-            replies: [
-                [
-                    `❌ *${varian.name}* sedang tidak tersedia.`,
-                    '',
-                    'Pilih paket lain, atau ketik *bantuan* untuk tanya admin.',
-                ].join('\n'),
-            ],
-        };
+        return { replies: [R.varianHabis(varian.name)] };
     }
 
-    const lanjut = {
-        ...state,
-        tahap: STATE.NAMA,
-        varianDipilih: varian,
-        nomor,
-    };
+    const label = varian.required_fields || [];
 
-    setState(chatId, lanjut);
-
-    return { replies: [R.mintaNama(state.produk, varian)] };
-}
-
-function terimaNama(state, teks, chatId, nomor) {
-    const nama = potong(teks.trim(), 80);
-
-    if (nama.length < 2) {
-        return { replies: ['❌ Nama terlalu pendek. Kirim nama lengkap Anda.'] };
-    }
-
-    const lanjut = { ...state, tahap: STATE.DATA, nama, nomor };
-    const label = state.varianDipilih?.required_fields || [];
-
+    // Tanpa data wajib: langsung buat pesanan + kirim QRIS.
     if (label.length === 0) {
-        lanjut.tahap = STATE.KONFIRMASI;
-        lanjut.data = {};
-        setState(chatId, lanjut);
-
-        return {
-            replies: [R.konfirmasiPesanan(state.produk, state.varianDipilih, nama, {})],
-        };
+        return buatPesanan({ ...state, varianDipilih: varian, nomor }, chatId, nomor, ctx);
     }
 
-    setState(chatId, lanjut);
+    setState(chatId, { ...state, tahap: STATE.DATA, varianDipilih: varian, nomor });
 
-    return { replies: [R.mintaDataWajib(state.produk, state.varianDipilih, label)] };
+    return { replies: [R.mintaDataWajib(state.produk, varian, label)] };
 }
 
-function terimaData(state, teks, chatId, nomor) {
+async function terimaData(state, teks, chatId, nomor, ctx) {
     const label = state.varianDipilih?.required_fields || [];
     const baris = teks
         .split('\n')
@@ -457,56 +422,27 @@ function terimaData(state, teks, chatId, nomor) {
         .filter((l) => l !== '');
 
     if (baris.length < label.length) {
-        return {
-            replies: [
-                [
-                    `❌ Butuh ${label.length} data, Anda mengirim ${baris.length}.`,
-                    '',
-                    'Kirim ulang, satu data per baris:',
-                    ...label.map((l, i) => `${i + 1}. ${l}`),
-                ].join('\n'),
-            ],
-        };
+        return { replies: [R.dataKurang(label, baris.length)] };
     }
 
-    // Nilai dipetakan berdasarkan URUTAN; label tetap dari server.
     const data = {};
     label.forEach((l, i) => {
         data[l] = baris[i];
     });
 
-    const lanjut = { ...state, tahap: STATE.KONFIRMASI, data, nomor };
-    setState(chatId, lanjut);
-
-    return {
-        replies: [R.konfirmasiPesanan(state.produk, state.varianDipilih, state.nama, data)],
-    };
+    return buatPesanan({ ...state, data }, chatId, nomor, ctx);
 }
 
-async function terimaKonfirmasi(state, aksi, chatId, nomor) {
-    const jawaban = String(aksi.teks || '').trim().toLowerCase();
-    const setuju = ['ya', 'y', 'yes', 'ok', 'oke', 'betul', 'benar', 'lanjut'].includes(jawaban);
-
-    if (!setuju) {
-        if (['tidak', 'no', 'nggak', 'gak', 'batal'].includes(jawaban)) {
-            clearState(chatId);
-            return { replies: [R.dibatalkan()] };
-        }
-
-        return {
-            replies: ['Ketik *ya* untuk membuat pesanan, atau *batal* untuk membatalkan.'],
-        };
-    }
-
+async function buatPesanan(state, chatId, nomor, ctx) {
     const varian = state.varianDipilih;
-    const label = varian?.required_fields || [];
-    const data = state.data || {};
+    const label = varian.required_fields || [];
 
-    // Data wajib dikirim sesuai urutan label yang diminta varian.
-    const requiredInfo = label.map((l) => data[l] ?? '');
+    // Nilai dikirim sesuai URUTAN label dari server (label tidak pernah
+    // dipercaya dari klien).
+    const requiredInfo = label.map((l) => state.data?.[l] ?? '');
 
     const hasil = await api.createOrder({
-        name: state.nama,
+        name: (ctx.nama || '').trim().slice(0, 80) || 'Pembeli',
         whatsapp: nomor,
         variant_id: varian.id,
         qty: 1,
@@ -524,15 +460,35 @@ async function terimaKonfirmasi(state, aksi, chatId, nomor) {
     };
 }
 
+/**
+ * Pembeli mengirim bukti transfer.
+ *
+ * Bot tidak bisa memverifikasi pembayaran (butuh akses rekening), jadi bot
+ * cukup mengonfirmasi penerimaan dan mengarahkan ke admin. Verifikasi tetap
+ * dilakukan admin di panel.
+ */
+async function buktiTransfer(nomor) {
+    let adaPesanan = false;
+
+    try {
+        const { orders } = await api.orderHistory(nomor);
+        adaPesanan = (orders || []).some((o) => o.can_pay && !o.is_paid);
+    } catch {
+        // API tidak bisa dihubungi: tetap anggap ada pesanan supaya pembeli
+        // tidak salah tingkah.
+        adaPesanan = true;
+    }
+
+    return { replies: [R.buktiDiterima(adaPesanan)] };
+}
+
 async function cekInvoice(invoice, nomor) {
     const data = await api.orderStatus(invoice, nomor);
 
-    const hasil = {
+    return {
         replies: [R.statusPesanan(data.order, data.contents)],
         // Diteruskan ke index.js supaya QRIS bisa dikirim ulang sebagai gambar.
         qris: data.payment?.qris_url || null,
         invoice: data.order?.invoice,
     };
-
-    return hasil;
 }

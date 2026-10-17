@@ -1,13 +1,15 @@
 /**
  * Uji alur percakapan end-to-end dengan API tiruan.
  *
- * Tidak butuh Chrome maupun WhatsApp: `fetch` diganti stub, jadi seluruh alur
- * (list -> detail -> nama -> data -> konfirmasi -> pesanan) bisa diuji di CI.
+ * Alur sederhana yang diuji:
+ *   list -> nomor produk -> nomor paket -> pesanan dibuat + QRIS
+ *   kirim bukti -> dikonfirmasi -> admin verifikasi -> isi akun dikirim
+ *
+ * Tidak butuh Chrome: `fetch` diganti stub.
  */
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 
-// Konfigurasi harus ada sebelum modul lain diimpor.
 process.env.BOT_API_TOKEN = 'token-uji';
 process.env.BOT_API_URL = 'http://toko.test';
 
@@ -32,7 +34,6 @@ const KATALOG = {
             ],
         },
     ],
-    products: [],
 };
 
 const DETAIL = {
@@ -83,7 +84,7 @@ function stubDefault() {
         if (path === '/api/bot/produk/gemini-pro') return DETAIL;
         if (path === '/api/bot/produk/canva-pro') return { ...DETAIL, product: { ...DETAIL.product, slug: 'canva-pro', name: 'Canva Pro' } };
         if (path === '/api/bot/produk/netflix') return { ...DETAIL, product: { ...DETAIL.product, slug: 'netflix', name: 'Netflix' } };
-        if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { method: 'qris_manual', qris_url: null, holder: '', expires_at: null } };
+        if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { method: 'qris_manual', qris_url: 'https://toko.test/qris.jpg', holder: 'Creative Solutions', expires_at: null } };
         if (path === '/api/bot/pesanan/status') return { order: PESANAN, contents: [] };
         if (path === '/api/bot/pesanan/riwayat') return { orders: [PESANAN] };
         return null;
@@ -97,8 +98,8 @@ beforeEach(async () => {
     panggilan = [];
     stubDefault();
 
-    // Modul di-cache antar test: reset state & cache katalog.
     engine = await import('../src/core/engine.js');
+
     const { clearState } = await import('../src/core/session.js');
     clearState('chat-uji');
     engine.resetRateLimit('6282395124106');
@@ -108,9 +109,11 @@ afterEach(() => {
     globalThis.fetch = asliFetch;
 });
 
-async function kirim(teks) {
-    return engine.handlePesan({ teks, nomor: '6282395124106', chatId: 'chat-uji' });
+async function kirim(teks, extra = {}) {
+    return engine.handlePesan({ teks, nomor: '6282395124106', chatId: 'chat-uji', ...extra });
 }
+
+// ------------------------------------------------------------------ katalog
 
 test('list menampilkan katalog dengan nomor urut', async () => {
     const { replies } = await kirim('list');
@@ -145,43 +148,49 @@ test('detail menampilkan semua varian + harga + stok', async () => {
     assert.match(teks, /1\. Sharing 1 Bulan — Rp5\.000/);
     assert.match(teks, /2\. Private 1 Bulan — ~Rp40\.000~ Rp35\.000/);
     assert.match(teks, /stok 5/);
-    // varian habis ditandai
     assert.match(teks, /3\. Private 1 Tahun.*❌/);
 });
 
-test('alur lengkap: pilih varian -> nama -> konfirmasi -> pesanan dibuat', async () => {
+// ---------------------------------------------------------------- alur pesan
+
+test('pilih paket langsung buat pesanan + QRIS (tanpa tanya nama)', async () => {
     await kirim('list');
     await kirim('1');
 
-    const mintaNama = await kirim('1');
-    assert.match(mintaNama.replies[0], /Siapa nama Anda/);
+    const selesai = await kirim('1');
 
-    const konfirmasi = await kirim('Budi Santoso');
-    assert.match(konfirmasi.replies[0], /Konfirmasi pesanan/);
-    assert.match(konfirmasi.replies[0], /Budi Santoso/);
-    assert.match(konfirmasi.replies[0], /Rp5\.000/);
-
-    const selesai = await kirim('ya');
     assert.match(selesai.replies[0], /Pesanan dibuat/);
     assert.match(selesai.replies[0], /INV261017ABCDE/);
     assert.match(selesai.replies[0], /Rp5\.000/);
+    assert.match(selesai.replies[0], /QRIS/);
+    assert.ok(selesai.order, 'pesanan harus dikembalikan untuk pengiriman QRIS');
+    assert.equal(selesai.payment.qris_url, 'https://toko.test/qris.jpg');
 
     const orderCall = panggilan.find((p) => p.path === '/api/bot/pesanan' && p.method === 'POST');
     assert.ok(orderCall, 'harus memanggil API pesanan');
-    assert.equal(orderCall.body.name, 'Budi Santoso');
     assert.equal(orderCall.body.variant_id, 10);
     assert.equal(orderCall.body.whatsapp, '6282395124106');
+    // Nama otomatis dari WhatsApp, bukan ditanya.
+    assert.equal(orderCall.body.name, 'Pembeli');
+});
+
+test('nama tampilan WhatsApp dipakai untuk invoice', async () => {
+    await kirim('list');
+    await kirim('1');
+
+    await kirim('1', { nama: 'Budi Santoso' });
+
+    const orderCall = panggilan.find((p) => p.path === '/api/bot/pesanan' && p.method === 'POST');
+    assert.equal(orderCall.body.name, 'Budi Santoso');
 });
 
 test('batal di tengah alur menghentikan pesanan', async () => {
     await kirim('list');
     await kirim('1');
-    await kirim('1');
 
     const batal = await kirim('batal');
     assert.match(batal.replies[0], /Dibatalkan/);
 
-    // setelah batal, angka tidak lagi memesan varian
     const { replies } = await kirim('1');
     assert.ok(!/Pesanan dibuat/.test(replies[0]));
     assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
@@ -190,7 +199,7 @@ test('batal di tengah alur menghentikan pesanan', async () => {
 test('varian habis ditolak dengan pesan jelas', async () => {
     await kirim('list');
     await kirim('1');
-    const { replies } = await kirim('3'); // Private 1 Tahun, purchasable: false
+    const { replies } = await kirim('3');
 
     assert.match(replies[0], /tidak tersedia/);
     assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
@@ -209,6 +218,20 @@ test('nomor produk di luar jangkauan ditolak', async () => {
     assert.match(replies[0], /Nomor tidak ada/);
 });
 
+test('list bisa dipakai lagi dari layar pilih paket', async () => {
+    await kirim('list');
+    await kirim('1');
+
+    const katalogLagi = await kirim('list');
+    assert.match(katalogLagi.replies[0], /Creative Solutions/);
+
+    // State keluar: angka berikutnya membuka produk lagi.
+    const detailLagi = await kirim('1');
+    assert.match(detailLagi.replies[0], /Pilih paket/);
+});
+
+// ------------------------------------------------------------------- pencarian
+
 test('pencarian satu hasil langsung membuka detail', async () => {
     const { replies } = await kirim('netflix');
     assert.match(replies[0], /Netflix/);
@@ -225,6 +248,31 @@ test('pencarian tanpa hasil memberi saran', async () => {
     const { replies } = await kirim('zzzz');
     assert.match(replies[0], /tidak ditemukan/);
 });
+
+// ---------------------------------------------------------------- bukti transfer
+
+test('kirim bukti transfer (gambar) dikonfirmasi', async () => {
+    await kirim('list');
+    await kirim('1');
+    await kirim('1');
+
+    const { replies } = await kirim('', { hasMedia: true });
+
+    assert.match(replies[0], /Bukti transfer diterima/);
+    assert.ok(panggilan.some((p) => p.path === '/api/bot/pesanan/riwayat'));
+});
+
+test('kirim bukti transfer (teks) dikonfirmasi', async () => {
+    await kirim('list');
+    await kirim('1');
+    await kirim('1');
+
+    const { replies } = await kirim('sudah transfer');
+
+    assert.match(replies[0], /Bukti transfer diterima/);
+});
+
+// ------------------------------------------------------------------ pesanan
 
 test('invoice memanggil status pesanan', async () => {
     const { replies } = await kirim('INV261017ABCDE');
@@ -248,19 +296,36 @@ test('status tanpa invoice meminta nomor invoice', async () => {
     assert.match(replies[0], /Kirim nomor invoice/);
 });
 
-test('bantuan menampilkan perintah', async () => {
+// ------------------------------------------------------------------ lain-lain
+
+test('bantuan menampilkan cara pesan', async () => {
     const { replies } = await kirim('bantuan');
     assert.match(replies[0], /\*list\*/);
     assert.match(replies[0], /wa\.me\/6282395124106/);
 });
 
-test('teks tak dikenal memberi panduan', async () => {
-    const { replies } = await kirim('asdfghjkl');
-    assert.match(replies[0], /belum mengerti|tidak ditemukan/);
+test('sapaan menampilkan sambutan', async () => {
+    const { replies } = await kirim('halo');
+    assert.match(replies[0], /Selamat datang/);
 });
 
+test('teks tak dikenal mencari produk lalu memberi saran', async () => {
+    const { replies } = await kirim('asdfghjkl');
+    assert.match(replies[0], /tidak ditemukan/);
+});
+
+test('rate limit menahan pesan berlebihan', async () => {
+    for (let i = 0; i < 5; i++) {
+        await engine.handlePesan({ teks: 'bantuan', nomor: '628111111111', chatId: 'chat-rate', batasRate: 3 });
+    }
+
+    const { replies } = await engine.handlePesan({ teks: 'bantuan', nomor: '628111111111', chatId: 'chat-rate', batasRate: 3 });
+    assert.match(replies[0], /Terlalu banyak pesan/);
+});
+
+// ------------------------------------------------------------- data wajib
+
 test('data wajib diminta dan dikirim sesuai urutan label', async () => {
-    // Varian dengan data wajib
     stubFetch((path) => {
         if (path === '/api/bot/katalog') return KATALOG;
         if (path === '/api/bot/produk/gemini-pro') {
@@ -271,112 +336,25 @@ test('data wajib diminta dan dikirim sesuai urutan label', async () => {
                 ],
             };
         }
-        if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { qris_url: null, holder: '' } };
+        if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { qris_url: 'https://toko.test/qris.jpg', holder: '' } };
         return null;
     });
 
-    // Mulai dari state bersih: katalog di-cache 60 detik, jadi jangan
-    // bergantung pada `list` untuk memuat ulang data.
     engine.resetRateLimit('6282395124106');
     const { clearState } = await import('../src/core/session.js');
     clearState('chat-uji');
 
-    // Urutan alur: pilih varian -> nama -> data wajib -> konfirmasi.
     await kirim('gemini pro');
-    const mintaNama = await kirim('1');
-    assert.match(mintaNama.replies[0], /Siapa nama Anda/);
 
-    const mintaData = await kirim('Budi');
+    const mintaData = await kirim('1');
     assert.match(mintaData.replies[0], /Email akun/);
     assert.match(mintaData.replies[0], /Password lama/);
 
-    const kirimData = await kirim('budi@contoh.test\nrahasia123');
-    assert.match(kirimData.replies[0], /Konfirmasi pesanan/);
-    assert.match(kirimData.replies[0], /budi@contoh\.test/);
-
-    await kirim('ya');
+    const selesai = await kirim('budi@contoh.test\nrahasia123');
+    assert.match(selesai.replies[0], /Pesanan dibuat/);
 
     const orderCall = panggilan.find((p) => p.path === '/api/bot/pesanan' && p.method === 'POST');
-    assert.deepEqual(orderCall.body.required_info, ['budi@contoh.test', 'rahasia123'], 'urutan nilai harus ikut urutan label');
-});
-
-test('perintah list saat ditanya nama tidak dianggap nama pembeli', async () => {
-    await kirim('list');
-    await kirim('1');
-
-    // Pilih paket pertama -> bot minta nama.
-    const mintaNama = await kirim('1');
-    assert.match(mintaNama.replies[0], /Siapa nama Anda/);
-
-    // Pembeli berubah pikiran di tengah alur.
-    const katalogLagi = await kirim('list');
-    assert.match(katalogLagi.replies[0], /Creative Solutions/);
-    assert.match(katalogLagi.replies[0], /Gemini Pro/);
-
-    // State harus benar-benar keluar: angka berikutnya membuka produk lagi,
-    // bukan dianggap nama "list".
-    const detailLagi = await kirim('1');
-    assert.match(detailLagi.replies[0], /Pilih paket/);
-
-    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'), 'tidak boleh ada pesanan');
-});
-
-test('perintah status saat menunggu data wajib tidak dianggap data', async () => {
-    stubFetch((path) => {
-        if (path === '/api/bot/katalog') return KATALOG;
-        if (path === '/api/bot/produk/gemini-pro') {
-            return {
-                ...DETAIL,
-                variants: [{ id: 31, name: 'Private', price: 50000, purchasable: true, stock: 1, required_fields: ['Email'] }],
-            };
-        }
-        return null;
-    });
-
-    engine.resetRateLimit('6282395124106');
-    const { clearState } = await import('../src/core/session.js');
-    clearState('chat-uji');
-
-    await kirim('gemini pro');
-    await kirim('1');
-    await kirim('Budi');
-
-    const status = await kirim('status');
-    assert.match(status.replies[0], /Kirim nomor invoice/);
-    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
-});
-
-test('data wajib berupa angka tetap tersimpan (Player ID)', async () => {
-    // Bug yang pernah terjadi: Player ID "12345678" dibaca sebagai "pilih
-    // nomor" sehingga datanya hilang dan pembeli diminta mengulang.
-    stubFetch((path) => {
-        if (path === '/api/bot/katalog') return KATALOG;
-        if (path === '/api/bot/produk/gemini-pro') {
-            return {
-                ...DETAIL,
-                variants: [{ id: 30, name: 'Private', price: 50000, purchasable: true, stock: 5, required_fields: ['Player ID'] }],
-            };
-        }
-        if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { qris_url: null, holder: '' } };
-        return null;
-    });
-
-    engine.resetRateLimit('6282395124106');
-    const { clearState } = await import('../src/core/session.js');
-    clearState('chat-uji');
-
-    await kirim('gemini pro');
-    await kirim('1');
-    await kirim('Budi');
-
-    const konfirmasi = await kirim('12345678');
-    assert.match(konfirmasi.replies[0], /Konfirmasi pesanan/);
-    assert.match(konfirmasi.replies[0], /12345678/, 'Player ID harus terbawa');
-
-    await kirim('ya');
-
-    const orderCall = panggilan.find((p) => p.path === '/api/bot/pesanan' && p.method === 'POST');
-    assert.deepEqual(orderCall.body.required_info, ['12345678']);
+    assert.deepEqual(orderCall.body.required_info, ['budi@contoh.test', 'rahasia123']);
 });
 
 test('data wajib kurang ditolak', async () => {
@@ -397,18 +375,59 @@ test('data wajib kurang ditolak', async () => {
 
     await kirim('gemini pro');
     await kirim('1');
-    await kirim('Budi');
 
     const { replies } = await kirim('hanya-satu-baris');
     assert.match(replies[0], /Butuh 2 data/);
     assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
 });
 
-test('rate limit menahan pesan berlebihan', async () => {
-    for (let i = 0; i < 5; i++) {
-        await engine.handlePesan({ teks: 'bantuan', nomor: '628111111111', chatId: 'chat-rate', batasRate: 3 });
-    }
+test('data wajib berupa angka tetap tersimpan (Player ID)', async () => {
+    stubFetch((path) => {
+        if (path === '/api/bot/katalog') return KATALOG;
+        if (path === '/api/bot/produk/gemini-pro') {
+            return {
+                ...DETAIL,
+                variants: [{ id: 30, name: 'Private', price: 50000, purchasable: true, stock: 5, required_fields: ['Player ID'] }],
+            };
+        }
+        if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { qris_url: null, holder: '' } };
+        return null;
+    });
 
-    const { replies } = await engine.handlePesan({ teks: 'bantuan', nomor: '628111111111', chatId: 'chat-rate', batasRate: 3 });
-    assert.match(replies[0], /Terlalu banyak pesan/);
+    engine.resetRateLimit('6282395124106');
+    const { clearState } = await import('../src/core/session.js');
+    clearState('chat-uji');
+
+    await kirim('gemini pro');
+    await kirim('1');
+
+    const selesai = await kirim('12345678');
+    assert.match(selesai.replies[0], /Pesanan dibuat/);
+
+    const orderCall = panggilan.find((p) => p.path === '/api/bot/pesanan' && p.method === 'POST');
+    assert.deepEqual(orderCall.body.required_info, ['12345678']);
+});
+
+test('status menunggu data wajib tidak dianggap data', async () => {
+    stubFetch((path) => {
+        if (path === '/api/bot/katalog') return KATALOG;
+        if (path === '/api/bot/produk/gemini-pro') {
+            return {
+                ...DETAIL,
+                variants: [{ id: 31, name: 'Private', price: 50000, purchasable: true, stock: 1, required_fields: ['Email'] }],
+            };
+        }
+        return null;
+    });
+
+    engine.resetRateLimit('6282395124106');
+    const { clearState } = await import('../src/core/session.js');
+    clearState('chat-uji');
+
+    await kirim('gemini pro');
+    await kirim('1');
+
+    const { replies } = await kirim('status');
+    assert.match(replies[0], /Kirim nomor invoice/);
+    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
 });

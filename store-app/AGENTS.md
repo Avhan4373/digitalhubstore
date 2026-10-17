@@ -145,17 +145,32 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   dan daftar yang dipakai `pilihProdukNomor()` sama-sama berasal dari
   `batasiKatalog()` → `daftarProdukDatar()`; ada test yang mencocokkan nomor di
   teks pesan dengan hasil pemilihan.
+- **Alur bot sederhana: pilih produk → QRIS → kirim bukti → admin verifikasi →
+  bot kirim isi akun.** Bot TIDAK menanyakan nama/konfirmasi; nama diambil dari
+  nama tampilan WhatsApp (`msg._data.notifyName`), fallback "Pembeli". Hanya
+  varian dengan `required_fields` yang masih ditanya (`STATE.DATA`). Jangan
+  menambah langkah tanya/konfirmasi baru tanpa alasan.
+- **Poller menyelesaikan pesanan.** `pollSelesai()` di `src/index.js` memeriksa
+  pesanan yang dibuat bot tiap 60 detik dan mengirim isi akun begitu statusnya
+  `delivered`/`completed`. Pemicunya tetap admin di panel — bot tidak boleh
+  menandai pesanan sendiri.
 - **Filter pesan wajib** (`core/wa-filter.js`): `fromMe`, `isStatus`,
   `broadcast`, `@g.us`, `@broadcast`, `@newsletter`. Tanpa `broadcast` bot
-  membalas setiap pesan siaran.
+  membalas setiap pesan siaran. **Chat pribadi = `@c.us` ATAU `@lid`** (Linked
+  Identity) — filter lama yang hanya menerima `@c.us` membuat bot mengabaikan
+  SEMUA pesan masuk.
+- **Bukti transfer:** gambar apa pun atau teks berisi "bukti"/"transfer"/"sudah
+  transfer" dianggap bukti; bot hanya mengonfirmasi, tidak memverifikasi.
+  Periksa urutan di `route()`: bukti harus diproses SEBELUM pencarian, kalau
+  tidak "sudah transfer" dianggap nama produk.
 - **Chrome harus 146.** Chrome lebih baru (termasuk Flatpak) membuat inject
   gagal (`Execution context was destroyed`). Pasang via `@puppeteer/browsers`.
 
 ## Perintah yang sering dipakai
 
 ```bash
-php artisan test                       # 104 test, SQLite in-memory
-cd bot-wa && npm test                  # 52 test bot (tanpa Chrome)
+php artisan test                       # 108 test, SQLite in-memory
+cd bot-wa && npm test                  # 68 test bot (tanpa Chrome)
 cd bot-wa && npm run simulate          # coba percakapan di terminal
 php artisan migrate:fresh --seed       # skema + katalog dari ../data/seed
 php artisan route:list --except-vendor

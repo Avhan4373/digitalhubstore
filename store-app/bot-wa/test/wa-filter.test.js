@@ -7,11 +7,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { chatIdDariNomor, harusDiabaikan, nomorDariChatId } from '../src/core/wa-filter.js';
+import { alasanDiabaikan, chatIdDariNomor, harusDiabaikan, nomorDariChatId } from '../src/core/wa-filter.js';
 
 test('filter: chat pribadi dilayani', () => {
     assert.equal(harusDiabaikan({ from: '6282395124106@c.us' }), false);
     assert.equal(harusDiabaikan({ from: '6282395124106@c.us', body: 'list' }), false);
+});
+
+test('filter: chat @lid (Linked Identity) DILAYANI', () => {
+    // WhatsApp kini mengirim sebagian chat dengan @lid. Filter lama menolaknya
+    // sehingga bot tidak pernah merespon — bug nyata yang pernah terjadi.
+    assert.equal(harusDiabaikan({ from: '54533652742258@lid' }), false);
+    assert.equal(alasanDiabaikan({ from: '54533652742258@lid' }), '');
 });
 
 test('filter: grup diabaikan', () => {
@@ -34,6 +41,21 @@ test('filter: pesan siaran diabaikan', () => {
 
 test('filter: newsletter/channel diabaikan', () => {
     assert.equal(harusDiabaikan({ from: '120363000000000000@newsletter' }), true);
+});
+
+test('alasan: memberi tahu kenapa pesan diabaikan', () => {
+    assert.match(alasanDiabaikan({ from: '6282395124106@c.us' }), /^$/);
+    assert.match(alasanDiabaikan({ from: '1203@g.us' }), /grup/);
+    assert.match(alasanDiabaikan({ from: '6282395124106@c.us', fromMe: true }), /diri sendiri/);
+    // dengan allowSelf, pesan diri sendiri tidak lagi jadi alasan
+    assert.equal(alasanDiabaikan({ from: '6282395124106@c.us', fromMe: true }, true), '');
+});
+
+test('filter: allowSelf mengizinkan pesan dari diri sendiri', () => {
+    // Berguna untuk uji coba tanpa HP kedua.
+    assert.equal(harusDiabaikan({ from: '628984697996@c.us', fromMe: true }, true), false);
+    // Default: tetap ditolak.
+    assert.equal(harusDiabaikan({ from: '628984697996@c.us', fromMe: true }), true);
 });
 
 test('filter: pesan kosong/null diabaikan', () => {

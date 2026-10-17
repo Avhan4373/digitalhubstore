@@ -21,30 +21,44 @@ dengan checkout web, sehingga tidak mungkin ada selisih harga antara web dan
 WhatsApp. Kalau API mati, bot berhenti melayani dengan pesan jelas — bukan
 mengarang data.
 
-## Perintah pembeli
+## Alur pembeli
+
+```
+1. Ketik list  -> katalog tampil
+2. Balas nomor produk  -> daftar paket
+3. Balas nomor paket   -> pesanan dibuat + QRIS dikirim
+4. Bayar, lalu kirim bukti transfer ke chat ini
+5. Admin verifikasi di panel
+6. Bot otomatis kirim isi akun
+```
+
+Bot **tidak** menanyakan nama atau konfirmasi: begitu paket dipilih, pesanan
+langsung dibuat dan QRIS langsung terkirim. Nama pembeli diambil dari nama
+tampilan WhatsApp.
+
+Hanya varian yang benar-benar butuh data (mis. "Email Canva") yang masih
+ditanyakan sebelum pesanan dibuat.
+
+## Perintah lain
 
 | Ketik | Hasil |
 |---|---|
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog per kategori + harga |
-| `1`, `2`, … | buka detail produk ke-N |
-| `1`, `2`, … (di layar detail) | pilih paket/varian |
-| `order` / `beli` | pesan paket pertama |
 | nama produk (`canva`, `netflix`) | cari produk |
-| `status` lalu nomor invoice | status pesanan + isi akun (kalau lunas) |
+| gambar / "sudah transfer" / "bukti" | konfirmasi bukti transfer |
+| `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
 | `bantuan` / `cs` | panduan + tautan admin |
 | `batal` | batalkan proses berjalan |
 
-## Alur pesanan
-
-```
-list → pilih produk → pilih paket → nama → data wajib (kalau ada)
-     → konfirmasi "ya" → pesanan dibuat di database + QRIS dikirim
-     → pembeli bayar → admin verifikasi di panel → isi akun terkirim
-```
-
 Pesanan yang dibuat bot **masuk ke database Laravel**, jadi muncul di panel
 admin, memotong stok, dan mengikuti aturan yang sama dengan pesanan web.
+
+## Notifikasi pesanan selesai
+
+Bot memeriksa pesanan yang dibuatnya tiap 60 detik. Begitu admin memverifikasi
+pembayaran (pesanan jadi terkirim), bot otomatis mengirim isi akun ke pembeli —
+tanpa pembeli perlu bertanya.
 
 ## Instalasi
 

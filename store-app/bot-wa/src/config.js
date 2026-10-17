@@ -92,6 +92,9 @@ export const config = {
     /** Uji coba dari nomor yang sama dengan bot (tanpa HP kedua). */
     allowSelf: process.env.BOT_ALLOW_SELF === 'true',
 
+    /** Berkas log opsional (mis. /tmp/bot-wa.log) untuk membaca riwayat. */
+    logFile: process.env.BOT_LOG_FILE || '',
+
     /** Versi WA Web yang dipin (mencegah update WhatsApp merusak inject). */
     webVersion: process.env.BOT_WEB_VERSION || '',
 

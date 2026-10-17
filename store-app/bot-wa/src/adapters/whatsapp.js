@@ -18,8 +18,8 @@ import path from 'node:path';
 import pkg from 'whatsapp-web.js';
 
 import { config } from '../config.js';
-import { log, maskNumber } from '../core/logger.js';
-import { harusDiabaikan, nomorDariChatId } from '../core/wa-filter.js';
+import { log, maskNumber, nomorPenuh } from '../core/logger.js';
+import { alasanDiabaikan, harusDiabaikan, nomorDariChatId } from '../core/wa-filter.js';
 
 // whatsapp-web.js adalah CJS: named import gagal di proyek ESM.
 const { Client, LocalAuth, MessageMedia } = pkg;
@@ -141,6 +141,49 @@ export function sesiTersimpanAda(akar = config.sessionPath) {
  *
  * @param {{onMessage: (pesan: {teks: string, chatId: string, nomor: string}) => Promise<void>}} handler
  */
+/**
+ * Identitas pembeli dari sebuah pesan.
+ *
+ * WhatsApp kini sering mengirim chat dengan alamat `@lid` (Linked Identity),
+ * yang bagian angkanya BUKAN nomor HP. Kita coba ubah ke JID berbasis nomor
+ * HP supaya pesanan & pengiriman memakai identitas yang benar; kalau gagal,
+ * pakai LID (tetap konsisten untuk pesanan yang dibuat & dicek bot).
+ *
+ * @returns {Promise<{nomor: string, lid: string|null, sendTo: string}>}
+ */
+async function identitasPembeli(msg, client) {
+    const chatId = String(msg.from || '');
+    const dasar = nomorDariChatId(chatId);
+
+    // Chat biasa (@c.us): tidak ada yang perlu diubah.
+    if (!chatId.endsWith('@lid')) {
+        return { nomor: dasar, lid: null, sendTo: chatId };
+    }
+
+    // @lid: coba ubah ke JID nomor HP lewat getNumberId (API whatsapp-web.js
+    // untuk konversi Linked Identity -> phone JID).
+    try {
+        const hasil = await client.getNumberId(dasar);
+
+        if (hasil?._serialized) {
+            const jid = hasil._serialized;
+
+            if (jid.endsWith('@c.us')) {
+                const nomor = nomorDariChatId(jid);
+                log.debug(`@lid ${maskNumber(dasar)} -> nomor HP ${maskNumber(nomor)}`);
+                return { nomor, lid: dasar, sendTo: jid };
+            }
+        }
+    } catch (e) {
+        log.debug(`getNumberId gagal: ${e.message}`);
+    }
+
+    // Fallback: pakai LID apa adanya. Bot tetap berfungsi, tapi identitas
+    // pembeli di pesanan adalah LID.
+    log.debug(`Chat @lid, pakai LID ${maskNumber(dasar)} sebagai identitas pembeli.`);
+    return { nomor: dasar, lid: dasar, sendTo: chatId };
+}
+
 export function buatAdapterWhatsApp(handler) {
     const chrome = cariChrome();
 
@@ -179,6 +222,13 @@ export function buatAdapterWhatsApp(handler) {
     /** Antrean kirim per chat supaya balasan tidak datang tidak berurutan. */
     const antrean = new Map();
 
+    /**
+     * JID tujuan per chat. Untuk chat `@lid` kita simpan JID berbasis nomor
+     * HP (kalau berhasil diubah) supaya pengiriman tidak bergantung pada
+     * dukungan `@lid` di whatsapp-web.js.
+     */
+    const sendToPerChat = new Map();
+
     function antre(chatId, tugas) {
         const sebelumnya = antrean.get(chatId) || Promise.resolve();
         const berikutnya = sebelumnya.then(tugas, tugas).catch((e) => {
@@ -203,6 +253,7 @@ export function buatAdapterWhatsApp(handler) {
         for (let i = 0; i < 3; i += 1) {
             try {
                 await client.sendMessage(chatId, teks);
+                log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)`);
                 return true;
             } catch (e) {
                 const sementara = /Execution context was destroyed|detached Frame|Target closed/i.test(e.message || '');
@@ -254,7 +305,14 @@ export function buatAdapterWhatsApp(handler) {
     });
 
     client.on('ready', () => {
-        log.info('WhatsApp siap. Bot siap menerima pesan (tanpa perlu scan ulang).');
+        // Cetak nomor bot sendiri supaya mudah dibandingkan dengan nomor
+        // pengirim — penyebab paling umum bot "diam" adalah pesan dari diri
+        // sendiri yang difilter.
+        const wid = client.info?.wid?._serialized || client.info?.wid || '(tidak terbaca)';
+        const nomorBot = nomorDariChatId(wid);
+
+        log.info(`WhatsApp siap. Nomor bot: ${nomorPenuh(nomorBot)}`);
+        log.info('Bot siap menerima pesan (tanpa perlu scan ulang).');
         handler.onReady?.();
     });
 
@@ -268,16 +326,24 @@ export function buatAdapterWhatsApp(handler) {
     });
 
     client.on('message', async (msg) => {
-        if (harusDiabaikan(msg, config.allowSelf)) return;
+        const alasan = alasanDiabaikan(msg, config.allowSelf);
+
+        if (alasan !== '') {
+            log.debug(`Pesan diabaikan (${alasan}) dari ${maskNumber(nomorDariChatId(msg.from))}`);
+            return;
+        }
 
         const chatId = msg.from;
-        const nomor = nomorDariChatId(chatId);
+        const { nomor, lid, sendTo } = await identitasPembeli(msg, client);
+        sendToPerChat.set(chatId, sendTo);
         const teks = String(msg.body || '');
+        const nama = String(msg._data?.notifyName || msg._data?.verifiedName || '').slice(0, 80);
+        const hasMedia = Boolean(msg.hasMedia);
 
         // Satu pesan error tidak boleh mematikan proses bot.
         try {
-            log.debug(`Pesan masuk dari ${maskNumber(nomor)}: ${teks.slice(0, 60)}`);
-            await handler.onMessage({ teks, chatId, nomor });
+            log.info(`Pesan masuk dari ${maskNumber(nomor)}${lid ? ` (lid ${maskNumber(lid)})` : ''}${hasMedia ? ' [gambar]' : ''}: ${teks.slice(0, 60)}`);
+            await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia });
         } catch (e) {
             log.error(`Handler pesan gagal: ${e.message}`);
         }
@@ -289,11 +355,15 @@ export function buatAdapterWhatsApp(handler) {
         mulai: () => client.initialize(),
 
         async kirim(chatId, teks) {
-            return antre(chatId, () => kirimTeks(chatId, teks));
+            const tujuan = sendToPerChat.get(chatId) || chatId;
+
+            return antre(chatId, () => kirimTeks(tujuan, teks));
         },
 
         async kirimMedia(chatId, url, caption) {
-            return antre(chatId, () => kirimGambar(chatId, url, caption));
+            const tujuan = sendToPerChat.get(chatId) || chatId;
+
+            return antre(chatId, () => kirimGambar(tujuan, url, caption));
         },
 
         async berhenti() {
