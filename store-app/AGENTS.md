@@ -141,6 +141,41 @@ gagal keras dengan pesan jelas kalau koneksi bukan SQLite. Kalau muncul error it
 php artisan optimize:clear   # lalu ulangi `php artisan test`
 ```
 
+## Perangkap: `public/build` tidak ikut `git push`
+
+`public/build` ada di `.gitignore`, dan `deploy.sh` di VPS hanya menjalankan
+`git reset --hard`. Jadi perubahan `resources/js` / `resources/css` **tidak akan
+sampai ke produksi** hanya dengan commit + push + deploy.sh.
+
+Selalu deploy lewat:
+
+```bash
+cd store-app && ./deploy-local.sh
+```
+
+Skrip itu build → push → tarik kode → rsync `public/build` → reload. Kalau
+manual, rsync-nya wajib:
+
+```bash
+rsync -az --delete public/build/ -e "ssh -i ~/.ssh/biznetgio" \
+    avhanvps@103.127.97.249:/var/www/digitalhubstore/store-app/public/build/
+```
+
+Cek cepat: nama `app-*.js` di `public/build/manifest.json` lokal harus sama
+dengan yang ada di VPS.
+
+## Perangkap: 301 tersimpan permanen di browser
+
+301 (`Moved Permanently`) di-cache browser **tanpa masa berlaku**. Kalau sebuah
+URL pernah di-301 ke tempat lain, memperbaiki konfigurasi server tidak langsung
+memulihkan pengunjung yang sudah pernah terkena — browser tidak akan bertanya
+lagi ke server.
+
+Karena itu, hindari 301 untuk URL yang mungkin perlu diubah perilakunya.
+Halaman pemulihan `/login.html` sengaja disajikan sebagai `200` + `Clear-Site-Data`,
+bukan redirect, dan `app.js` memulangkan pengunjung yang terlanjur mendarat di
+`/login` karena dilempar aplikasi lama (dikenali dari `document.referrer`).
+
 ## Jangan
 
 - Mengaktifkan kembali endpoint tanpa auth (order/stats/katalog publik).

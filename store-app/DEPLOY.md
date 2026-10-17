@@ -147,16 +147,47 @@ ssh avhanvps@103.127.97.249 'cd /var/www/digitalhubstore/store-app && rm -rf pub
 
 ## 8. Deploy / update
 
+**Pakai skrip lokal** (paling aman — mengirim aset juga):
+
+```bash
+cd store-app && ./deploy-local.sh
+```
+
+Skrip itu menjalankan urutan yang benar: `npm run build` → push → tarik kode di
+VPS → **rsync `public/build`** → reload PHP-FPM + nginx.
+
+Kalau ingin manual, dua langkah ini **wajib berpasangan**:
+
 ```bash
 ssh -i ~/.ssh/biznetgio avhanvps@103.127.97.249 'bash /var/www/digitalhubstore/deploy.sh'
+rsync -az --delete public/build/ -e "ssh -i ~/.ssh/biznetgio" \
+    avhanvps@103.127.97.249:/var/www/digitalhubstore/store-app/public/build/
 ```
 
 Isi `deploy.sh`: `git reset --hard origin/main` → `composer install --no-dev`
 → `php artisan migrate --force` → rebuild cache (`config`, `route`, `view`) →
 perbaiki izin → reload `php8.3-fpm` + `nginx`.
 
-**Setelah pull yang mengubah view/CSS/JS, kirim ulang `public/build` dari
-lokal** (langkah 7), karena VPS tidak menjalankan `npm run build`.
+### Perangkap: aset tidak ikut ter-deploy
+
+`public/build` ada di `.gitignore`, jadi `deploy.sh` (yang hanya `git reset
+--hard`) **tidak pernah** membawa bundel baru. Kalau langkah rsync dilewati, VPS
+menyajikan JS/CSS lama sementara kode PHP-nya sudah baru — perubahan
+`resources/js` dan `resources/css` tampak "tidak berpengaruh" padahal sudah
+di-commit.
+
+Ciri khasnya: nama berkas di VPS berbeda dengan hasil build lokal.
+
+```bash
+# lokal
+ls public/build/assets/app-*.js
+# VPS — harus sama
+ssh -i ~/.ssh/biznetgio avhanvps@103.127.97.249 \
+  'ls /var/www/digitalhubstore/store-app/public/build/assets/app-*.js'
+```
+
+Kalau berbeda, jalankan rsync di atas. Nama berkas ber-hash, jadi browser
+otomatis mengambil yang baru — tidak perlu hard-refresh.
 
 ---
 
