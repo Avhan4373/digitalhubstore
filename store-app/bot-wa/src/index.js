@@ -87,14 +87,35 @@ async function tanganiPesan({ teks, chatId, nomor }) {
         return;
     }
 
-    const hasil = await handlePesan({
-        teks,
-        nomor,
-        chatId,
-        batasRate: config.rateLimitPerMinute,
-    });
+    log.info(`Pesan masuk dari ${maskNumber(nomor)}: ${String(teks || '').slice(0, 60)}`);
 
-    await kirimHasil(chatId, hasil);
+    try {
+        const hasil = await handlePesan({
+            teks,
+            nomor,
+            chatId,
+            batasRate: config.rateLimitPerMinute,
+        });
+
+        await kirimHasil(chatId, hasil);
+    } catch (e) {
+        // Jangan biarkan satu pesan yang gagal mematikan proses bot atau
+        // meninggalkan pembeli tanpa balasan.
+        log.error(`Gagal memproses pesan dari ${maskNumber(nomor)}: ${e?.message || e}`);
+
+        try {
+            await adapter.kirim(
+                chatId,
+                [
+                    '⚠️ Maaf, terjadi gangguan sementara.',
+                    '',
+                    'Coba kirim ulang pesan Anda, atau hubungi admin.',
+                ].join('\\n'),
+            );
+        } catch (sendErr) {
+            log.error(`Gagal mengirim pesan gangguan: ${sendErr?.message || sendErr}`);
+        }
+    }
 }
 
 function mulaiAdapter() {

@@ -23,13 +23,23 @@ function normalisasi(text) {
         .replace(/\s+/g, ' ');
 }
 
+/** Alias yang boleh dicocokkan sebagai substring (kata dalam kalimat). */
+const ALIAS_SUBSTRING = new Set(['list', 'katalog', 'catalog', 'produk', 'menu', 'daftar', 'harga', 'price']);
+
 /**
  * Cocokkan teks ke salah satu alias.
+ * Cek persis dulu, lalu cek substring hanya untuk perintah katalog.
  * @returns {string|null} nama perintah
  */
 function cocokAlias(teks) {
     for (const [perintah, daftar] of Object.entries(ALIAS)) {
         if (daftar.includes(teks)) return perintah;
+    }
+    // Substring match hanya untuk perintah list/katalog supaya
+    // "daftar produk canva" tetap dikenali sebagai permintaan katalog.
+    const kata = teks.split(' ');
+    for (const k of kata) {
+        if (ALIAS_SUBSTRING.has(k)) return 'list';
     }
     return null;
 }
@@ -65,16 +75,16 @@ export function parsePesan(teks) {
         return bungkus({ type: 'invoice', invoice: invoice[1].toUpperCase() });
     }
 
-    // 2. Perintah teks
-    const perintah = cocokAlias(teks2);
-    if (perintah) {
-        return bungkus({ type: perintah });
-    }
-
-    // "list 2" / "katalog 3" -> buka produk ke-N
+// 2. "list 2" / "katalog 3" -> buka produk ke-N (sebelum cocokAlias supaya tidak tertangkap substring)
     const listNomor = teks2.match(/^(?:list|katalog|produk|menu|daftar)\s+(\d{1,3})$/);
     if (listNomor) {
         return bungkus({ type: 'pilih_produk', nomor: Number(listNomor[1]) });
+    }
+
+    // 3. Perintah teks
+    const perintah = cocokAlias(teks2);
+    if (perintah) {
+        return bungkus({ type: perintah });
     }
 
     // 3. Angka polos: pilih produk atau varian tergantung state

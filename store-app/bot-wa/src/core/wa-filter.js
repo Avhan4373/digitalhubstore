@@ -10,11 +10,14 @@
  * Pesan yang harus diabaikan.
  *
  * `broadcast` paling sering terlewat: tanpa pemeriksaan ini bot membalas
- * setiap pesan daftar siaran.
+ * setiap pesan daftar siaran dan bisa membanjiri kontak.
+ *
+ * `fromMe` (pesan sendiri) diabaikan secara default. Aktifkan `allowSelf`
+ * hanya saat uji coba dari nomor yang sama dengan bot (tanpa HP kedua).
+ * Jangan aktifkan di produksi — bisa memicu loop balasan.
  */
-export function harusDiabaikan(msg) {
+export function harusDiabaikan(msg, allowSelf = false) {
     if (!msg) return true;
-    if (msg.fromMe) return true;
     if (msg.isStatus) return true;
     if (msg.broadcast) return true;
 
@@ -25,7 +28,12 @@ export function harusDiabaikan(msg) {
     if (from.includes('@newsletter')) return true;
 
     // Hanya chat pribadi.
-    return !from.endsWith('@c.us');
+    if (!from.endsWith('@c.us')) return true;
+
+    // Pesan sendiri: diabaikan kecuali uji coba.
+    if (msg.fromMe && !allowSelf) return true;
+
+    return false;
 }
 
 /** 628123456789@c.us -> 628123456789 */

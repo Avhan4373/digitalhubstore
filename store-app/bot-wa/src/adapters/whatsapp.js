@@ -268,7 +268,7 @@ export function buatAdapterWhatsApp(handler) {
     });
 
     client.on('message', async (msg) => {
-        if (harusDiabaikan(msg)) return;
+        if (harusDiabaikan(msg, config.allowSelf)) return;
 
         const chatId = msg.from;
         const nomor = nomorDariChatId(chatId);

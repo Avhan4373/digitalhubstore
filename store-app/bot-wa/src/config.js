@@ -89,6 +89,9 @@ export const config = {
     /** Log level: debug | info | warn | error */
     logLevel: process.env.BOT_LOG_LEVEL || 'info',
 
+    /** Uji coba dari nomor yang sama dengan bot (tanpa HP kedua). */
+    allowSelf: process.env.BOT_ALLOW_SELF === 'true',
+
     /** Versi WA Web yang dipin (mencegah update WhatsApp merusak inject). */
     webVersion: process.env.BOT_WEB_VERSION || '',
 

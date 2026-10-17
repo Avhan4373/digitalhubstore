@@ -85,6 +85,18 @@ Tanpa token yang cocok, seluruh endpoint `/api/bot/*` menolak semua permintaan.
 | `BOT_WEB_VERSION` | pin versi WA Web, mis. `2.3000.1012355863` |
 | `BOT_LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` |
 
+## Uji dari nomor yang sama dengan bot (tanpa HP kedua)
+
+Kalau Anda hanya punya satu nomor (nomor toko), aktifkan uji coba sendiri:
+
+```env
+BOT_ALLOW_SELF=true
+```
+
+Lalu kirim `list` dari chat dengan diri sendiri. Nonaktifkan lagi (`false`)
+setelah selesai — di produksi harus `false` supaya bot tidak membalas pesan
+sendiri.
+
 ## Uji tanpa WhatsApp
 
 Seluruh alur bisa diuji tanpa Chrome dan tanpa scan QR:

@@ -153,6 +153,47 @@ export async function handlePesan({ teks, nomor, chatId, batasRate = 20 }) {
             if (e.status === 422 || e.status === 403 || e.status === 404) {
                 return { replies: [`⚠️ ${e.message}`] };
             }
+
+            // Bot belum diaktifkan di Laravel, atau token tidak cocok: jangan
+            // diam saja — beri tahu pembeli agar tidak menunggu balasan kosong.
+            if (e.status === 503) {
+                log.error(`API menolak: ${e.message}`);
+                return {
+                    replies: [
+                        [
+                            '⚠️ Bot sedang tidak aktif di server toko.',
+                            '',
+                            'Hubungi admin atau coba lagi nanti.',
+                        ].join('\\n'),
+                    ],
+                };
+            }
+
+            if (e.status === 401) {
+                log.error(`Token bot tidak valid: ${e.message}`);
+                return {
+                    replies: [
+                        [
+                            '⚠️ Bot tidak bisa menghubungi server toko.',
+                            '',
+                            'Admin perlu memeriksa konfigurasi bot.',
+                        ].join('\\n'),
+                    ],
+                };
+            }
+
+            if (e.status === 0) {
+                log.error(`Tidak bisa menghubungi server toko: ${e.message}`);
+                return {
+                    replies: [
+                        [
+                            '⚠️ Server toko tidak bisa dihubungi.',
+                            '',
+                            'Coba lagi beberapa saat, atau hubungi admin.',
+                        ].join('\\n'),
+                    ],
+                };
+            }
         }
 
         throw e;
