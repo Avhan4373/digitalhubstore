@@ -220,7 +220,7 @@ scrape, pengaturan, dan akun admin tetap utuh.**
 | | |
 |---|---|
 | URL | `https://store.avhanapp.my.id/login` |
-| Email | `admin@digitalhubstore.test` |
+| Email | `admin@creativesolutions.test` |
 | Password | lihat `ADMIN_SEED_PASSWORD` di `.env` server |
 
 Ganti email/password lewat panel admin setelah login pertama. Password seed
