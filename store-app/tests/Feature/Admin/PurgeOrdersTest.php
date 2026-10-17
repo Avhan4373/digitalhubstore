@@ -144,6 +144,38 @@ class PurgeOrdersTest extends TestCase
         $this->assertSame(1, DB::table('variants')->count());
     }
 
+    public function test_reset_sold_mengembalikan_angka_terjual_ke_nol(): void
+    {
+        $produk = $this->makeProduct();
+        $produk->forceFill(['sold_count' => 30_000, 'sold_is_estimate' => true])->save();
+
+        $lain = $this->makeProduct(['name' => 'Produk Lain']);
+        $lain->forceFill(['sold_count' => 1_500, 'sold_is_estimate' => true])->save();
+
+        $this->assertSame(31_500, (int) DB::table('products')->sum('sold_count'));
+
+        $this->artisan('pesanan:bersihkan', ['--force' => true, '--reset-sold' => true])
+            ->assertSuccessful();
+
+        $this->assertSame(0, (int) DB::table('products')->sum('sold_count'), 'semua angka terjual jadi 0');
+
+        // Bukan lagi angka estimasi hasil scrape.
+        $this->assertSame(0, DB::table('products')->where('sold_is_estimate', true)->count());
+
+        // Katalog tidak ikut terhapus.
+        $this->assertSame(2, DB::table('products')->count());
+    }
+
+    public function test_tanpa_reset_sold_angka_terjual_dipertahankan(): void
+    {
+        $produk = $this->makeProduct();
+        $produk->forceFill(['sold_count' => 30_000, 'sold_is_estimate' => true])->save();
+
+        $this->artisan('pesanan:bersihkan', ['--force' => true])->assertSuccessful();
+
+        $this->assertSame(30_000, (int) DB::table('products')->sum('sold_count'), 'tanpa opsi, angka terjual tidak disentuh');
+    }
+
     public function test_tanpa_force_tidak_menghapus_apa_pun(): void
     {
         $variant = $this->makeVariant($this->makeProduct(), [

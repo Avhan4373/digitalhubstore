@@ -119,7 +119,7 @@ if (! function_exists('storage_url')) {
 if (! function_exists('wa_normalize')) {
     /**
      * Normalisasi nomor WhatsApp Indonesia ke format 62xxxx.
-     * Menerima "0822-4389-0517", "+62 822 4389 0517", "6282243890517".
+     * Menerima "0823-9512-4106", "+62 823 9512 4106", "6282395124106".
      */
     function wa_normalize(?string $number): string
     {
@@ -199,7 +199,7 @@ if (! function_exists('mask_wa')) {
 }
 
 if (! function_exists('wa_display')) {
-    /** 6282243890517 -> "+62 822-4389-0517" (untuk tampilan). */
+    /** 6282395124106 -> "+62 823-9512-4106" (untuk tampilan). */
     function wa_display(?string $number): string
     {
         $digits = wa_normalize($number);

@@ -133,7 +133,7 @@
                         <div class="flex items-center justify-around rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-center">
                             <div>
                                 <span class="block text-[10px] text-slate-400">Terjual</span>
-                                <span class="font-bold text-slate-800">{{ sold_label($product->sold_count) }}</span>
+                                <span class="font-bold text-slate-800">{{ $product->sold_count > 0 ? sold_label($product->sold_count) : '—' }}</span>
                             </div>
                             <div class="h-5 w-px bg-slate-200"></div>
                             <div>

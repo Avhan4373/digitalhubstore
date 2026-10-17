@@ -29,7 +29,7 @@ class Setting extends Model
         return [
             ['general', 'store_name', 'Creative Solutions', 'string', 'Nama toko', false],
             ['general', 'store_tagline', 'Akun premium resmi, bergaransi penuh', 'string', 'Tagline', false],
-            ['general', 'store_whatsapp', '6282243890517', 'string', 'Nomor WhatsApp admin', false],
+            ['general', 'store_whatsapp', '6282395124106', 'string', 'Nomor WhatsApp admin', false],
             ['general', 'store_email', '', 'string', 'Email toko', false],
             ['general', 'store_logo', '', 'file', 'Logo toko (kosong = monogram nama toko)', false],
             ['general', 'store_banner', '', 'file', 'Banner promo halaman depan', false],
