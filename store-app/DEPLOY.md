@@ -224,3 +224,40 @@ Contoh:
 mysqldump -u digitalhub -p digitalhubstore | gzip > ~/backup/db-$(date +%F).sql.gz
 tar czf ~/backup/env-$(date +%F).tgz /var/www/digitalhubstore/store-app/.env
 ```
+
+---
+
+## 14. Service worker lama (insiden `/login.html`)
+
+`store.avhanapp.my.id` **sebelumnya dipakai aplikasi lain (Aero Crash)** yang
+mendaftarkan service worker di `/sw.js` dan menyimpan app shell-nya. Aero juga
+punya `login.html` dan di JS-nya terdapat:
+
+```js
+ze() || location.replace("login.html")   // redirect relatif
+```
+
+Karena redirect-nya relatif, pengunjung yang pernah membuka origin ini saat
+masih menyajikan Aero akan terus diarahkan ke
+`https://store.avhanapp.my.id/login.html` — yang di aplikasi toko tidak ada.
+Gejalanya: membuka beranda langsung "dilempar" ke `/login.html`.
+
+Penanganan (sudah terpasang):
+
+1. **`public/sw.js` = kill-switch.** Skrip ini `skipWaiting()`, menghapus
+   seluruh `CacheStorage`, `unregister()` dirinya sendiri, lalu me-reload tab.
+   Browser memeriksa ulang `/sw.js` pada setiap navigasi, jadi pengunjung lama
+   pulih otomatis tanpa perlu membersihkan data situs manual.
+2. **nginx: `/sw.js` tidak boleh di-cache.**
+   ```nginx
+   location = /sw.js {
+       add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+       expires off;
+       try_files $uri =404;
+   }
+   ```
+3. **nginx: `/login.html` → 301 `/login`** supaya pengunjung yang masih
+   diarahkan ke halaman lama berakhir di login toko, bukan 404.
+
+> Kalau suatu saat memasang PWA di origin ini, ingat bahwa **selalu** ada
+> `public/sw.js` kill-switch yang lebih dulu terpasang di pengunjung lama.
