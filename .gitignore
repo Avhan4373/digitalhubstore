@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Hasil scrape mentah (dibuat ulang oleh scrape.py)
+data/*.sqlite
+data/*.sqlite-journal
+data/raw/
+data/export/
+
+# Laravel
+store-app/vendor/
+store-app/node_modules/
+store-app/.env
+store-app/.env.*
+!store-app/.env.example
+store-app/public/build/
+store-app/public/hot
+store-app/public/storage
+store-app/storage/*.key
+store-app/storage/app/private/
+store-app/storage/app/public/
+store-app/storage/framework/cache/data/
+store-app/storage/framework/sessions/
+store-app/storage/framework/views/
+store-app/storage/logs/
+store-app/database/database.sqlite
+store-app/.phpunit.cache/
+store-app/.phpunit.result.cache

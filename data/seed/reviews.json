@@ -1,0 +1,402 @@
+[
+ {
+  "external_id": "rev_1791538763912",
+  "product_external_id": "1787557174193",
+  "user_name": "Antonius",
+  "rating": 3,
+  "comment": "Tidak amanah. Saya beli paket gemini  pro 18 bulan sejak tgl 1 oktober 2026. Awal nya berhasil,tapi tiba2 per hari ini akun saya tdk pro lagi. Admin tidak ada respon. Hati2 kalian semua. Tidak amanah ini",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-10-09T09:39:23.239Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1791074658119",
+  "product_external_id": "1787557174193",
+  "user_name": "Azhat",
+  "rating": 3,
+  "comment": "Ini saya beli yang 18 bulan, belum 18 bulan udah habis aja loh",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-10-04T00:44:15.358Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790988045488",
+  "product_external_id": "1787557174193",
+  "user_name": "Pembeli",
+  "rating": 1,
+  "comment": "ADMIN TAKEOVER — stored XSS + spam proven",
+  "variant_name": "Resmi",
+  "created_at": "2026-10-03T00:40:45.488Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790987602964",
+  "product_external_id": "1787557174193",
+  "user_name": "Pembeli",
+  "rating": 5,
+  "comment": "<script>alert(1)</script>",
+  "variant_name": "Resmi",
+  "created_at": "2026-10-03T00:33:22.964Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790964160742",
+  "product_external_id": "1787557174193",
+  "user_name": "taqi",
+  "rating": 4,
+  "comment": "ini klo udh pernah google pro bisa ga?",
+  "variant_name": "18 Bulan",
+  "created_at": "2026-10-02T18:02:40.597Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790250034500",
+  "product_external_id": "1787557174193",
+  "user_name": "Keren",
+  "rating": 5,
+  "comment": "Langsung aktif gemini pro",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-24T11:40:33.966Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790060382015",
+  "product_external_id": "1787557174193",
+  "user_name": "Rangga",
+  "rating": 5,
+  "comment": "Sat set enak banget",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-22T06:59:41.835Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790043071067",
+  "product_external_id": "1787557174193",
+  "user_name": "Whiz company",
+  "rating": 5,
+  "comment": "Real gaess sumpah",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-22T02:11:10.940Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1790041848957",
+  "product_external_id": "1787557174193",
+  "user_name": "Abdul",
+  "rating": 5,
+  "comment": "Keren",
+  "variant_name": "18 Bulan",
+  "created_at": "2026-09-22T01:50:48.890Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789892454306",
+  "product_external_id": "1787557174193",
+  "user_name": "Ammar",
+  "rating": 5,
+  "comment": "Bagus semoga di lancarkan bisnisnya",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-20T08:20:54.333Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789885744355",
+  "product_external_id": "1787557174193",
+  "user_name": "Yulius",
+  "rating": 5,
+  "comment": "Nantap",
+  "variant_name": "18 Bulan",
+  "created_at": "2026-09-20T06:29:03.543Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789869799579",
+  "product_external_id": "1787557174193",
+  "user_name": "M ILYAS",
+  "rating": 5,
+  "comment": "Mantabb harga lebih murah",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-20T02:03:18.496Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789869177226",
+  "product_external_id": "1787639790405",
+  "user_name": "h",
+  "rating": 4,
+  "comment": "p",
+  "variant_name": "1 Bulan Team",
+  "created_at": "2026-09-20T01:52:56.267Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789798747107",
+  "product_external_id": "1787557174193",
+  "user_name": "theo",
+  "rating": 5,
+  "comment": "works, respon admin juga bagus",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-19T06:19:06.801Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789797553902",
+  "product_external_id": "1787557174193",
+  "user_name": "Junaramadhani",
+  "rating": 5,
+  "comment": "Joss, berfungsi dengan semestinya aku bisa buat banyak hal dengan ini",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-19T05:59:14.583Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789738395904",
+  "product_external_id": "1787557174193",
+  "user_name": "Ferangga Aden",
+  "rating": 5,
+  "comment": "Udah beli 2 Kali fast respon banget ssuka poll",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-18T13:33:15.684Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789726368130",
+  "product_external_id": "1787557174193",
+  "user_name": "I Ketut Yuda Prawira Mandala Putra",
+  "rating": 5,
+  "comment": "best pokoknya terimakasih",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-18T10:12:48.436Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789714845970",
+  "product_external_id": "1787557174193",
+  "user_name": "Wahid",
+  "rating": 5,
+  "comment": "Mantap banget",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-18T07:00:45.355Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789661241053",
+  "product_external_id": "1787557174193",
+  "user_name": "Deva",
+  "rating": 5,
+  "comment": "Proses cepatttt",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-17T16:07:20.644Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789645941526",
+  "product_external_id": "1787545466884",
+  "user_name": "a",
+  "rating": 5,
+  "comment": "jis",
+  "variant_name": "7 Hari Privat",
+  "created_at": "2026-09-17T11:52:20.734Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789619156802",
+  "product_external_id": "1787639790405",
+  "user_name": "Trio Nirmolo",
+  "rating": 5,
+  "comment": "Mantul",
+  "variant_name": "1 Bulan Team",
+  "created_at": "2026-09-17T04:25:56.610Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789617415632",
+  "product_external_id": "1787557174193",
+  "user_name": "ha",
+  "rating": 5,
+  "comment": "san mantappp cepat trusted",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-17T03:56:53.596Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789540377135",
+  "product_external_id": "1787557174193",
+  "user_name": "Rudi Dwi Rangga",
+  "rating": 5,
+  "comment": "Nice",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-16T06:33:30.950Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789527375214",
+  "product_external_id": "1787557174193",
+  "user_name": "Muh ilham",
+  "rating": 5,
+  "comment": "Mau coba2",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-16T02:56:12.636Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789479628915",
+  "product_external_id": "1787557174193",
+  "user_name": "Timothy",
+  "rating": 5,
+  "comment": "mantap kali, responsif adminnya dan cepet masuknya",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-15T13:40:28.489Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789448830512",
+  "product_external_id": "1787557174193",
+  "user_name": "Kangkung",
+  "rating": 5,
+  "comment": "Memang mantap kali, sat set udah selesai, caranya mudah lagi thank youuuu kakk",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-15T05:07:09.296Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789397199032",
+  "product_external_id": "1787639790405",
+  "user_name": "hafiz",
+  "rating": 5,
+  "comment": "mantap langsup bisa, fast respon juga",
+  "variant_name": "1 Bulan Team",
+  "created_at": "2026-09-14T14:46:38.372Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789277621399",
+  "product_external_id": "1787557174193",
+  "user_name": "Nataa",
+  "rating": 5,
+  "comment": "Mantap bener, adminnya juga responsif Pokoknya top",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-13T05:33:40.994Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789185670531",
+  "product_external_id": "1787557174193",
+  "user_name": "Pupung Widiyapurnama",
+  "rating": 5,
+  "comment": "Mantap luar biasa bener bener pro harha murah dan cs nya baik banget pelayanan ramah trims ka seller sukssz selalu",
+  "variant_name": "Gemini Head 18 Bulan",
+  "created_at": "2026-09-12T04:01:10.199Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789184660083",
+  "product_external_id": "1787557174193",
+  "user_name": "Setiawan",
+  "rating": 5,
+  "comment": "Mantap",
+  "variant_name": "1 Bulan",
+  "created_at": "2026-09-12T03:44:19.568Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "rev_1789120277240",
+  "product_external_id": "1787557174193",
+  "user_name": "Elfardev",
+  "rating": 5,
+  "comment": "Sangat responsif cepet tinggal klik langsung jadi pro, g perlu atur payment lagi",
+  "variant_name": "18 Bulan",
+  "created_at": "2026-09-11T09:51:16.229Z",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787592119665:None:daniyale bobisu",
+  "product_external_id": "1787592119665",
+  "user_name": "daniyale bobisu",
+  "rating": 5,
+  "comment": "mantap, respon cepat dan harga bersahabat",
+  "variant_name": "Googleflow (18 bulan )",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787592119665:None:Muhammad Farhan",
+  "product_external_id": "1787592119665",
+  "user_name": "Muhammad Farhan",
+  "rating": 5,
+  "comment": "Pembelian kedua. Dan Alhamdulillah aktivasi gak ribet dan langsung pro",
+  "variant_name": "Googleflow (18 bulan )",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787551310902:None:4zisen",
+  "product_external_id": "1787551310902",
+  "user_name": "4zisen",
+  "rating": 5,
+  "comment": "Mantap pelayanan oke",
+  "variant_name": "1 Tahun",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787557174193:None:ferdi",
+  "product_external_id": "1787557174193",
+  "user_name": "ferdi",
+  "rating": 5,
+  "comment": "mantap",
+  "variant_name": "1 Bulan",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787557174193:None:Seinki",
+  "product_external_id": "1787557174193",
+  "user_name": "Seinki",
+  "rating": 5,
+  "comment": "Mantep, terpercaya, respon cepet",
+  "variant_name": "1 Bulan",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787557174193:None:Nopal",
+  "product_external_id": "1787557174193",
+  "user_name": "Nopal",
+  "rating": 5,
+  "comment": "Mantap sesuai",
+  "variant_name": "1 Bulan",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787557174193:None:Alvin",
+  "product_external_id": "1787557174193",
+  "user_name": "Alvin",
+  "rating": 5,
+  "comment": "Mantap",
+  "variant_name": "1 Bulan",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787557174193:None:Fadillah",
+  "product_external_id": "1787557174193",
+  "user_name": "Fadillah",
+  "rating": 5,
+  "comment": "Respons cepat⭐⭐⭐⭐⭐",
+  "variant_name": "1 Bulan",
+  "created_at": "Baru saja",
+  "status": "approved"
+ },
+ {
+  "external_id": "1787557174193:None:Resky",
+  "product_external_id": "1787557174193",
+  "user_name": "Resky",
+  "rating": 5,
+  "comment": "Mantap cuy hehe",
+  "variant_name": "1 Bulan",
+  "created_at": "Baru saja",
+  "status": "approved"
+ }
+]

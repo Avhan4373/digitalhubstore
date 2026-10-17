@@ -1,0 +1,234 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+
+@theme {
+    /* Situs asal memakai Google Font "Outfit" untuk seluruh UI. */
+    --font-sans: 'Outfit', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+        'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Warna brand toko — diambil apa adanya dari situs asal (#f5125e). */
+    --color-brand-50: #fff1f5;
+    --color-brand-100: #ffe3ec;
+    --color-brand-200: #ffc7da;
+    --color-brand-300: #ff9cbd;
+    --color-brand-400: #ff477e;
+    --color-brand-500: #f5125e;
+    --color-brand-600: #d40c4e;
+    --color-brand-700: #b00a40;
+    --color-brand-800: #910c39;
+    --color-brand-900: #7a0d34;
+}
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
+    /* Slider gambar produk (dipakai halaman detail) — sama seperti situs asal. */
+    .product-slider-container {
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .product-slider-item {
+        scroll-snap-align: start;
+        flex-shrink: 0;
+    }
+
+    img {
+        -webkit-user-drag: none;
+    }
+
+    /* Angka & kode selalu monospace, teks lain memakai Outfit. */
+    pre,
+    code,
+    .font-mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+}
+
+@layer utilities {
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    /*
+     | Layar sentuh: target sentuh minimal ~40px supaya tombol kecil
+     | (.btn-sm) di panel admin tetap nyaman ditekan jempol, dan tabel
+     | yang lebar bisa digeser dengan momentum di dalam .table-wrap.
+     */
+    @media (max-width: 1023px) {
+        .btn-sm {
+            min-height: 2.25rem;
+        }
+
+        .table-wrap {
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+}
+
+@layer components {
+    /* Animasi yang dipakai di kartu ulasan & toast bukti sosial. */
+    @keyframes fadeInReview {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes bounceSoft {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        50% {
+            transform: translateY(-8px);
+        }
+    }
+
+    @keyframes typingDot {
+        0%,
+        100% {
+            transform: translateY(0);
+            opacity: 0.5;
+        }
+        50% {
+            transform: translateY(-3px);
+            opacity: 1;
+        }
+    }
+
+    .animate-review {
+        animation: fadeInReview 0.25s ease-out forwards;
+    }
+
+    .animate-bounce-soft {
+        animation: bounceSoft 2s infinite ease-in-out;
+    }
+
+    .typing-indicator span {
+        display: inline-block;
+        width: 4px;
+        height: 4px;
+        background-color: var(--color-brand-500);
+        border-radius: 50%;
+        animation: typingDot 1s infinite;
+        margin: 0 1px;
+    }
+
+    .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    /*
+     |--------------------------------------------------------------------
+     | Kelas reusable (dipakai halaman storefront & admin)
+     |--------------------------------------------------------------------
+     */
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger,
+    .btn-ghost {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+               transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2
+               disabled:cursor-not-allowed disabled:opacity-50;
+    }
+    .btn-primary { @apply bg-gradient-to-r from-brand-500 to-brand-400 text-white shadow-sm shadow-brand-200 hover:opacity-95 active:scale-95; }
+    .btn-secondary { @apply bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50; }
+    .btn-danger { @apply bg-rose-600 text-white hover:bg-rose-700; }
+    .btn-ghost { @apply text-slate-600 hover:bg-slate-100; }
+    .btn-sm { @apply rounded-lg px-3 py-1.5 text-xs; }
+
+    .field {
+        @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800
+               transition focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500
+               placeholder:font-normal placeholder:text-slate-400;
+    }
+    .label { @apply mb-1 block text-[10px] font-bold text-slate-500 uppercase tracking-wide; }
+    .hint { @apply mt-1 text-xs text-slate-500; }
+    .error-text { @apply mt-1 text-xs font-medium text-rose-600; }
+
+    .card,
+    .card-pad { @apply rounded-2xl border border-slate-200/90 bg-white shadow-2xs; }
+    .card-pad { @apply p-4 sm:p-5; }
+
+    .badge,
+    .badge-brand { @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ring-1; }
+    .badge-brand { @apply bg-rose-50 text-brand-500 ring-rose-100; }
+
+    /* Kartu putih gaya situs asal. */
+    .sf-card { @apply rounded-2xl border border-slate-200/80 bg-white shadow-2xs; }
+    .sf-card-soft { @apply rounded-2xl border border-rose-100/60 bg-white shadow-2xs; }
+
+    .table-wrap { @apply overflow-x-auto rounded-2xl ring-1 ring-slate-200/70; }
+    .table { @apply min-w-full divide-y divide-slate-200 text-sm; }
+    .table thead { @apply bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500; }
+    .table th { @apply whitespace-nowrap px-4 py-3; }
+    .table td { @apply px-4 py-3 align-top text-slate-700; }
+    .table tbody tr { @apply border-t border-slate-100 hover:bg-slate-50/60; }
+
+    .nav-link { @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-slate-900; }
+    .nav-link-active { @apply bg-white text-brand-600 shadow-sm; }
+}
+
+/*
+ |--------------------------------------------------------------------
+ | Cetak: hanya lembarnya yang dicetak
+ |--------------------------------------------------------------------
+ | Tombol "Unduh PDF" di popup cek transaksi menandai <body> dengan
+ | data-print-scope="sheet". Semua isi halaman disembunyikan dan hanya
+ | popup lembar invoice yang tetap tampil (tanpa latar gelap).
+ */
+@media print {
+    body[data-print-scope='sheet'] > * {
+        display: none !important;
+    }
+
+    body[data-print-scope='sheet'] .cek-sheet-modal {
+        position: static !important;
+        display: block !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        inset: auto !important;
+    }
+
+    body[data-print-scope='sheet'] .cek-sheet-modal > .absolute {
+        display: none !important;
+    }
+
+    body[data-print-scope='sheet'] .cek-sheet-modal [data-sheet-chrome] {
+        display: none !important;
+    }
+
+    body[data-print-scope='sheet'] .cek-sheet-modal .cek-sheet-card {
+        max-width: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    body[data-print-scope='sheet'] .cek-sheet-content {
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+}

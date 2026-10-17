@@ -1,0 +1,32 @@
+[
+ {
+  "name": "AI",
+  "slug": "ai",
+  "sort_order": 0
+ },
+ {
+  "name": "Editor",
+  "slug": "editor",
+  "sort_order": 1
+ },
+ {
+  "name": "Landing",
+  "slug": "landing",
+  "sort_order": 2
+ },
+ {
+  "name": "Stream",
+  "slug": "stream",
+  "sort_order": 3
+ },
+ {
+  "name": "Template Web",
+  "slug": "template-web",
+  "sort_order": 4
+ },
+ {
+  "name": "meeting",
+  "slug": "meeting",
+  "sort_order": 5
+ }
+]
