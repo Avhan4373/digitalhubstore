@@ -103,6 +103,40 @@ async function mediaDariUrl(url) {
 }
 
 /**
+ * Apakah sesi WhatsApp (LocalAuth) sudah pernah disimpan?
+ *
+ * Kalau ya, bot seharusnya login otomatis tanpa QR. Kalau tidak, QR akan
+ * muncul dan pembeli harus scan sekali.
+ *
+ * @param {string} [akar] folder sesi (default: config.sessionPath)
+ */
+export function sesiTersimpanAda(akar = config.sessionPath) {
+
+    if (!fs.existsSync(akar)) return false;
+
+    let ada = false;
+
+    try {
+        for (const nama of fs.readdirSync(akar)) {
+            if (!nama.startsWith('session')) continue;
+
+            const jalur = path.join(akar, nama);
+
+            if (!fs.statSync(jalur).isDirectory()) continue;
+
+            if (fs.readdirSync(jalur).length > 0) {
+                ada = true;
+                break;
+            }
+        }
+    } catch {
+        return false;
+    }
+
+    return ada;
+}
+
+/**
  * Buat adapter WhatsApp.
  *
  * @param {{onMessage: (pesan: {teks: string, chatId: string, nomor: string}) => Promise<void>}} handler
@@ -111,6 +145,14 @@ export function buatAdapterWhatsApp(handler) {
     const chrome = cariChrome();
 
     log.info(`Chrome: ${chrome}`);
+
+    // Sebelum inisialisasi: kalau sesi sudah ada, beri tahu pengguna bahwa bot
+    // akan login otomatis tanpa QR.
+    if (sesiTersimpanAda()) {
+        log.info('Sesi tersimpan ditemukan — bot akan login otomatis tanpa QR.');
+    } else {
+        log.info('Belum ada sesi tersimpan — QR akan muncul, scan sekali saja.');
+    }
 
     const opsi = {
         authStrategy: new LocalAuth({ dataPath: config.sessionPath }),
@@ -189,12 +231,30 @@ export function buatAdapterWhatsApp(handler) {
     }
 
     client.on('qr', (qr) => {
-        // QR ditampilkan oleh index.js lewat qrcode-terminal
-        handler.onQr?.(qr);
+        // QR hanya perlu ditampilkan kalau sesi tersimpan TIDAK cukup untuk
+        // login otomatis. Kalau sesi ada, WhatsApp Web biasanya langsung
+        // `authenticated` tanpa QR — jadi handler ini tidak dipanggil.
+        if (sesiTersimpanAda()) {
+            log.warn('Sesi tersimpan ada, tapi WhatsApp tetap meminta QR. Sesi mungkin kedaluwarsa — scan ulang.');
+        } else {
+            log.info('Belum ada sesi tersimpan. Scan QR berikut dengan WhatsApp > Perangkat Tertaut.');
+        }
+
+    // QR ditampilkan oleh index.js lewat qrcode-terminal. Jangan panggil
+    // qrcode.generate di sini agar tidak duplikat.
+    if (handler.onQr) {
+        handler.onQr(qr);
+    }
+    });
+
+    client.on('authenticated', () => {
+        // Event ini dipanggil kalau login berhasil dari sesi tersimpan
+        // MAUPUN dari scan QR. Ini bukti bahwa sesi valid.
+        log.info('Autentikasi berhasil. Sesi tersimpan untuk login otomatis berikutnya.');
     });
 
     client.on('ready', () => {
-        log.info('WhatsApp siap. Bot siap menerima pesan.');
+        log.info('WhatsApp siap. Bot siap menerima pesan (tanpa perlu scan ulang).');
         handler.onReady?.();
     });
 

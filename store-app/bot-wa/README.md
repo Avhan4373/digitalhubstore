@@ -142,3 +142,18 @@ WantedBy=multi-user.target
   pesanan sudah dibayar.
 - **Sesi LocalAuth berisi kunci akun WhatsApp.** Jangan commit `.wwebjs_auth/`
   (sudah ada di `.gitignore`).
+
+## Sesi WhatsApp (scan QR sekali saja)
+
+Bot memakai `LocalAuth` dengan folder `.wwebjs_auth/`. Setelah scan QR
+pertama kali, sesi disimpan di folder itu dan bot akan **login otomatis
+tanpa QR** setiap kali dijalankan ulang.
+
+- `run-lokal.sh` hanya menghapus `SingletonLock` (berkas kunci Chrome yang
+  macet), **bukan** sesi. Sesi tidak akan hilang.
+- Kalau bot minta scan ulang terus, kemungkinan sesi kedaluwarsa atau rusak:
+  jalankan `./run-lokal.sh --reset` untuk menghapus sesi dan scan ulang.
+- Sesi disimpan di disk biasa (bukan tmpfs), jadi tetap ada setelah reboot.
+
+Saat sesi valid, bot mencetak `Autentikasi berhasil. Sesi tersimpan untuk
+login otomatis berikutnya.` dan `WhatsApp siap` — tidak ada QR.
