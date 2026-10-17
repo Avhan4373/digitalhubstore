@@ -300,6 +300,52 @@ test('data wajib diminta dan dikirim sesuai urutan label', async () => {
     assert.deepEqual(orderCall.body.required_info, ['budi@contoh.test', 'rahasia123'], 'urutan nilai harus ikut urutan label');
 });
 
+test('perintah list saat ditanya nama tidak dianggap nama pembeli', async () => {
+    await kirim('list');
+    await kirim('1');
+
+    // Pilih paket pertama -> bot minta nama.
+    const mintaNama = await kirim('1');
+    assert.match(mintaNama.replies[0], /Siapa nama Anda/);
+
+    // Pembeli berubah pikiran di tengah alur.
+    const katalogLagi = await kirim('list');
+    assert.match(katalogLagi.replies[0], /Creative Solutions/);
+    assert.match(katalogLagi.replies[0], /Gemini Pro/);
+
+    // State harus benar-benar keluar: angka berikutnya membuka produk lagi,
+    // bukan dianggap nama "list".
+    const detailLagi = await kirim('1');
+    assert.match(detailLagi.replies[0], /Pilih paket/);
+
+    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'), 'tidak boleh ada pesanan');
+});
+
+test('perintah status saat menunggu data wajib tidak dianggap data', async () => {
+    stubFetch((path) => {
+        if (path === '/api/bot/katalog') return KATALOG;
+        if (path === '/api/bot/produk/gemini-pro') {
+            return {
+                ...DETAIL,
+                variants: [{ id: 31, name: 'Private', price: 50000, purchasable: true, stock: 1, required_fields: ['Email'] }],
+            };
+        }
+        return null;
+    });
+
+    engine.resetRateLimit('6282395124106');
+    const { clearState } = await import('../src/core/session.js');
+    clearState('chat-uji');
+
+    await kirim('gemini pro');
+    await kirim('1');
+    await kirim('Budi');
+
+    const status = await kirim('status');
+    assert.match(status.replies[0], /Kirim nomor invoice/);
+    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
+});
+
 test('data wajib berupa angka tetap tersimpan (Player ID)', async () => {
     // Bug yang pernah terjadi: Player ID "12345678" dibaca sebagai "pilih
     // nomor" sehingga datanya hilang dan pembeli diminta mengulang.

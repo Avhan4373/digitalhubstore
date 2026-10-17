@@ -191,18 +191,31 @@ async function route(aksi, state, chatId, nomor) {
     // ------------------------------------------- state yang menunggu isian
     // HARUS diperiksa sebelum cabang pencarian: saat menunggu nama, pembeli
     // mengetik "Budi Santoso" — itu nama, bukan kata kunci katalog.
-    switch (state?.tahap) {
-        case STATE.NAMA:
-            return terimaNama(state, String(aksi.teks ?? ''), chatId, nomor);
+    //
+    // TAPI perintah darurat tetap harus bisa keluar dari state: jangan pernah
+    // menjadikan "list"/"status"/"riwayat" sebagai nama pembeli atau data wajib.
+    const perintahDarurat = ['list', 'lanjut', 'status', 'riwayat'];
+    const sedangMenungguIsian = state?.tahap === STATE.NAMA || state?.tahap === STATE.DATA;
+    const keluarDariState = sedangMenungguIsian && perintahDarurat.includes(aksi.type);
 
-        case STATE.DATA:
-            return terimaData(state, String(aksi.teks ?? ''), chatId, nomor);
+    if (keluarDariState) {
+        clearState(chatId);
+    }
 
-        case STATE.KONFIRMASI:
-            return terimaKonfirmasi(state, aksi, chatId, nomor);
+    if (!keluarDariState) {
+        switch (state?.tahap) {
+            case STATE.NAMA:
+                return terimaNama(state, String(aksi.teks ?? ''), chatId, nomor);
 
-        default:
-            break;
+            case STATE.DATA:
+                return terimaData(state, String(aksi.teks ?? ''), chatId, nomor);
+
+            case STATE.KONFIRMASI:
+                return terimaKonfirmasi(state, aksi, chatId, nomor);
+
+            default:
+                break;
+        }
     }
 
     // ---------------------------------------------------------------- katalog
