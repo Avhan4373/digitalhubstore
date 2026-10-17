@@ -146,8 +146,8 @@ export function sesiTersimpanAda(akar = config.sessionPath) {
  *
  * WhatsApp kini sering mengirim chat dengan alamat `@lid` (Linked Identity),
  * yang bagian angkanya BUKAN nomor HP. Kita coba ubah ke JID berbasis nomor
- * HP supaya pesanan & pengiriman memakai identitas yang benar; kalau gagal,
- * pakai LID (tetap konsisten untuk pesanan yang dibuat & dicek bot).
+ * HP supaya pesanan & pengiriman memakai nomor yang benar; kalau gagal, pakai
+ * LID (tetap konsisten untuk pesanan yang dibuat & dicek bot).
  *
  * @returns {Promise<{nomor: string, lid: string|null, sendTo: string}>}
  */
@@ -155,21 +155,24 @@ async function identitasPembeli(msg, client) {
     const chatId = String(msg.from || '');
     const dasar = nomorDariChatId(chatId);
 
-    // Chat biasa (@c.us): tidak ada yang perlu diubah.
+    // Chat biasa (@c.us / @s.whatsapp.net): tidak ada yang perlu diubah.
     if (!chatId.endsWith('@lid')) {
         return { nomor: dasar, lid: null, sendTo: chatId };
     }
 
-    // @lid: coba ubah ke JID nomor HP lewat getNumberId (API whatsapp-web.js
-    // untuk konversi Linked Identity -> phone JID).
+    // ---------------------------------------------------------------- strategi 1
+    // getNumberId mengubah LID menjadi JID nomor HP. whatsapp-web.js kini
+    // memakai @s.whatsapp.net (bukan @c.us) untuk JID berbasis nomor.
     try {
         const hasil = await client.getNumberId(dasar);
+        const jid = hasil?._serialized;
 
-        if (hasil?._serialized) {
-            const jid = hasil._serialized;
+        log.debug(`getNumberId(${dasar}) -> ${jid || '(kosong)'}`);
 
-            if (jid.endsWith('@c.us')) {
-                const nomor = nomorDariChatId(jid);
+        if (jid && (jid.endsWith('@c.us') || jid.endsWith('@s.whatsapp.net'))) {
+            const nomor = nomorDariChatId(jid);
+
+            if (nomorValid(nomor)) {
                 log.debug(`@lid ${maskNumber(dasar)} -> nomor HP ${maskNumber(nomor)}`);
                 return { nomor, lid: dasar, sendTo: jid };
             }
@@ -178,10 +181,32 @@ async function identitasPembeli(msg, client) {
         log.debug(`getNumberId gagal: ${e.message}`);
     }
 
-    // Fallback: pakai LID apa adanya. Bot tetap berfungsi, tapi identitas
-    // pembeli di pesanan adalah LID.
+    // ---------------------------------------------------------------- strategi 2
+    // Data kontak bisa memuat nomor HP walau JID-nya @lid.
+    try {
+        const kontak = await client.getContactById(chatId);
+        const mentah = kontak?.number || kontak?.numberFormatted || '';
+        const nomor = String(mentah).replace(/\D/g, '');
+
+        log.debug(`kontak ${chatId} -> number=${mentah || '(kosong)'}`);
+
+        if (nomorValid(nomor)) {
+            return { nomor, lid: dasar, sendTo: `${nomor}@c.us` };
+        }
+    } catch (e) {
+        log.debug(`getContactById gagal: ${e.message}`);
+    }
+
+    // ---------------------------------------------------------------- strategi 3
+    // Tetap pakai LID. Bot bisa membuat & mengecek pesanan, tapi admin tidak
+    // bisa menghubungi pembeli lewat wa.me. Pembeli akan diminta nomor HP-nya.
     log.debug(`Chat @lid, pakai LID ${maskNumber(dasar)} sebagai identitas pembeli.`);
     return { nomor: dasar, lid: dasar, sendTo: chatId };
+}
+
+/** Nomor WhatsApp Indonesia yang masuk akal: 62 + 8..14 digit. */
+export function nomorValid(nomor) {
+    return /^62\d{8,14}$/.test(String(nomor || '').replace(/\D/g, ''));
 }
 
 export function buatAdapterWhatsApp(handler) {

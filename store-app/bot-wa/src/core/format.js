@@ -95,6 +95,17 @@ export function normalisasiNomor(number) {
     return digits;
 }
 
+/**
+ * Nomor WhatsApp Indonesia yang masuk akal: 62 + 8..14 digit.
+ *
+ * Dipakai untuk menolak LID (Linked Identity) yang bagian angkanya bukan
+ * nomor HP — kalau tidak, pesanan dibuat dengan identitas yang tidak bisa
+ * dihubungi admin lewat wa.me.
+ */
+export function nomorValid(nomor) {
+    return /^62\d{8,14}$/.test(String(nomor || '').replace(/\D/g, ''));
+}
+
 /** 6282395124106 -> "+62 823-9512-4106" */
 export function tampilkanNomor(number) {
     const digits = normalisasiNomor(number);

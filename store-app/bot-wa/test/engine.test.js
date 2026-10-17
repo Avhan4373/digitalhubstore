@@ -323,6 +323,39 @@ test('rate limit menahan pesan berlebihan', async () => {
     assert.match(replies[0], /Terlalu banyak pesan/);
 });
 
+// ------------------------------------------------------------- nomor tidak valid
+
+test('nomor tak valid (LID): bot minta nomor WhatsApp lalu buat pesanan', async () => {
+    const LID = '54533652742258';
+
+    await kirim('list');
+    await kirim('1');
+
+    // Paket dipilih dengan nomor LID -> bot minta nomor HP.
+    const minta = await kirim('1', { nomor: LID });
+    assert.match(minta.replies[0], /nomor WhatsApp/);
+    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'), 'belum boleh buat pesanan');
+
+    // Pembeli mengirim nomor HP-nya.
+    const selesai = await kirim('082395124106', { nomor: LID });
+    assert.match(selesai.replies[0], /Pesanan dibuat/);
+
+    const orderCall = panggilan.find((p) => p.path === '/api/bot/pesanan' && p.method === 'POST');
+    assert.equal(orderCall.body.whatsapp, '6282395124106', 'pesanan harus pakai nomor HP');
+});
+
+test('nomor tak valid yang dikirim ulang tetap ditolak', async () => {
+    const LID = '54533652742258';
+
+    await kirim('list');
+    await kirim('1');
+    await kirim('1', { nomor: LID });
+
+    const lagi = await kirim('12345', { nomor: LID });
+    assert.match(lagi.replies[0], /nomor WhatsApp/);
+    assert.ok(!panggilan.some((p) => p.path === '/api/bot/pesanan'));
+});
+
 // ------------------------------------------------------------- data wajib
 
 test('data wajib diminta dan dikirim sesuai urutan label', async () => {

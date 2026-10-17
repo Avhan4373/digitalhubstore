@@ -12,7 +12,7 @@
  * Tidak ada akses WhatsApp di sini: `index.js`/adapter yang mengirim pesan.
  */
 import { api, ApiError } from './api.js';
-import { normalisasiNomor } from './format.js';
+import { normalisasiNomor, nomorValid } from './format.js';
 import { parsePesan } from './parser.js';
 import * as R from './replies.js';
 import { clearState, getState, setState, STATE } from './session.js';
@@ -50,6 +50,11 @@ function kenaRateLimit(nomor, batas) {
 
 export function resetRateLimit(nomor) {
     hits.delete(nomor);
+}
+
+/** Perbarui nomor pembeli untuk sebuah chat (mis. setelah diminta manual). */
+export function catatNomor(chatId, nomor) {
+    if (nomor) nomorPerChat.set(chatId, nomor);
 }
 
 /** @returns {Array<{chatId: string, nomor: string}>} */
@@ -253,6 +258,20 @@ async function route(aksi, state, chatId, nomor, ctx) {
         return terimaData(state, ctx.teks, chatId, nomor, ctx);
     }
 
+    // Menunggu nomor WhatsApp pembeli (hanya terjadi kalau chat @lid tidak
+    // bisa diubah menjadi nomor HP).
+    if (state?.tahap === STATE.NOMOR && !adalahPerintah(ctx.teks)) {
+        const t = normalisasiNomor(ctx.teks);
+
+        if (!nomorValid(t)) {
+            return { replies: [R.mintaNomor(state.produk, state.varianDipilih)] };
+        }
+
+        catatNomor(chatId, t);
+
+        return buatPesanan({ ...state, nomor: t }, chatId, t, { ...ctx, nomor: t });
+    }
+
     // Perintah darurat tetap bisa keluar dari layar pilih produk.
     if (state?.tahap === STATE.DETAIL && PERINTAH_DARURAT.includes(aksi.type)) {
         clearState(chatId);
@@ -403,6 +422,14 @@ async function pilihVarian(state, nomorVarian, chatId, nomor, ctx) {
     }
 
     const label = varian.required_fields || [];
+
+    // Nomor harus valid supaya pesanan tidak dibuat dengan LID (yang tidak
+    // bisa dihubungi admin lewat wa.me). Kalau belum, tanya sekali.
+    if (!nomorValid(nomor)) {
+        setState(chatId, { ...state, tahap: STATE.NOMOR, varianDipilih: varian, nomor });
+
+        return { replies: [R.mintaNomor(state.produk, varian)] };
+    }
 
     // Tanpa data wajib: langsung buat pesanan + kirim QRIS.
     if (label.length === 0) {

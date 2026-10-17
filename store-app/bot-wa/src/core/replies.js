@@ -294,9 +294,26 @@ export function riwayatPesanan(daftar) {
     return baris.join('\n').trim();
 }
 
+/**
+ * Minta nomor WhatsApp pembeli.
+ *
+ * Hanya muncul kalau chat memakai alamat @lid (Linked Identity) yang tidak
+ * bisa diubah menjadi nomor HP. Tanpa nomor ini, pesanan tidak bisa dibuat.
+ */
+export function mintaNomor(produk, varian) {
+    return [
+        `📝 *${produk.name} — ${varian.name}*`,
+        `${rupiah(varian.price)}`,
+        '',
+        'Sebelum saya buatkan pesanan, saya butuh *nomor WhatsApp* Anda',
+        '(format Indonesia, contoh: *0823xxxxxxx*).',
+        '',
+        'Ini dipakai untuk mengirim isi akun & status pesanan.',
+    ].join('\n');
+}
+
 /** Permintaan data wajib sebelum pesanan dibuat. */
-export function mintaDataWajib(produk, varian, label) {
-    const baris = [
+export function mintaDataWajib(produk, varian, label) {    const baris = [
         `📝 *${produk.name} — ${varian.name}*`,
         `${rupiah(varian.price)}`,
         '',

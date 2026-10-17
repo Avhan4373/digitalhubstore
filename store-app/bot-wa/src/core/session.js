@@ -68,10 +68,8 @@ export const STATE = {
     PILIH_CARI: 'pilih_cari',
     /** Sedang melihat detail produk; `angka` memilih varian. */
     DETAIL: 'detail',
-    /** Menunggu nama pembeli. */
-    NAMA: 'nama',
+    /** Menunggu nomor WhatsApp pembeli (hanya jika LID tidak bisa diubah). */
+    NOMOR: 'nomor',
     /** Menunggu data wajib (mis. email akun). */
     DATA: 'data',
-    /** Menunggu konfirmasi ya/batal. */
-    KONFIRMASI: 'konfirmasi',
 };
