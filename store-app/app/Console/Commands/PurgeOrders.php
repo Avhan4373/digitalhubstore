@@ -18,15 +18,20 @@ use Illuminate\Support\Facades\DB;
  * Yang DIPERTAHANKAN: katalog (produk/varian/kategori/gambar), ulasan hasil
  * scrape (tidak punya `order_id`), pengaturan toko, dan akun admin.
  *
+ * Pakai `--with-reviews` untuk sekaligus membuang ulasan hasil scrape. Itu
+ * penting sebelum go-live: ulasan scrape adalah testimoni pihak lain yang
+ * tidak pernah benar-benar membeli di toko ini.
+ *
  * Dipakai sebelum go-live: `php artisan pesanan:bersihkan --force`.
  */
 class PurgeOrders extends Command
 {
     protected $signature = 'pesanan:bersihkan
                             {--force : Jangan minta konfirmasi (wajib untuk skrip/produksi)}
-                            {--keep-stock : Pertahankan stok yang masih tersedia}';
+                            {--keep-stock : Pertahankan stok yang masih tersedia}
+                            {--with-reviews : Hapus juga ulasan hasil scrape (tanpa order_id)}';
 
-    protected $description = 'Hapus semua pesanan, pengiriman, ulasan pesanan, log, dan stok (katalog tetap)';
+    protected $description = 'Hapus semua pesanan, pengiriman, ulasan, log, dan stok (katalog tetap)';
 
     public function handle(): int
     {
@@ -38,13 +43,14 @@ class PurgeOrders extends Command
         $ulasanKatalog = Review::query()->whereNull('order_id')->count();
         $stock = StockItem::query()->count();
         $logs = DB::table('activity_logs')->count();
+        $buangUlasan = (bool) $this->option('with-reviews');
 
         $this->table(['Data', 'Jumlah'], [
             ['Pesanan', $orders.' (di antaranya '.$terhapus.' di tempat sampah)'],
             ['Item pesanan', $items],
             ['Isi pengiriman', $deliveries],
             ['Ulasan pesanan (dihapus)', $reviews],
-            ['Ulasan katalog (dipertahankan)', $ulasanKatalog],
+            ['Ulasan katalog', $buangUlasan ? $ulasanKatalog.' (DIHAPUS)' : $ulasanKatalog.' (dipertahankan)'],
             ['Stok', $stock],
             ['Log aktivitas', $logs],
         ]);
@@ -55,7 +61,7 @@ class PurgeOrders extends Command
             return self::FAILURE;
         }
 
-        DB::transaction(function () {
+        DB::transaction(function () use ($buangUlasan) {
             // Urutan penting karena foreign key: anak dulu, induk belakangan.
             DB::table('order_deliveries')->delete();
 
@@ -70,9 +76,13 @@ class PurgeOrders extends Command
                 ]);
             }
 
-            // Ulasan hasil scrape tidak punya order_id, jadi aman: hanya ulasan
-            // yang benar-benar menempel ke pesanan yang ikut dihapus.
-            Review::query()->whereNotNull('order_id')->delete();
+            // Ulasan hasil scrape tidak punya order_id. Dengan --with-reviews
+            // keduanya dibuang: testimoni scrape bukan pembeli toko ini.
+            if ($buangUlasan) {
+                Review::query()->delete();
+            } else {
+                Review::query()->whereNotNull('order_id')->delete();
+            }
 
             DB::table('order_items')->delete();
             DB::table('orders')->delete();   // termasuk baris soft-deleted
@@ -82,7 +92,9 @@ class PurgeOrders extends Command
             Coupon::query()->update(['used_count' => 0]);
         });
 
-        $this->info('Data transaksi dibersihkan. Katalog, ulasan, pengaturan, dan akun admin tetap utuh.');
+        $this->info($buangUlasan
+            ? 'Data transaksi + ulasan scrape dibersihkan. Katalog, pengaturan, dan akun admin tetap utuh.'
+            : 'Data transaksi dibersihkan. Katalog, ulasan, pengaturan, dan akun admin tetap utuh.');
 
         return self::SUCCESS;
     }

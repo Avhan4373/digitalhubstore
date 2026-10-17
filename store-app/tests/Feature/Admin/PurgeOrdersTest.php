@@ -97,6 +97,53 @@ class PurgeOrdersTest extends TestCase
         $this->assertSame(2, $variant->fresh()->availableStock(), 'stok kembali tersedia, bukan dihapus');
     }
 
+    public function test_with_reviews_menghapus_ulasan_hasil_scrape(): void
+    {
+        $variant = $this->makeVariant($this->makeProduct(), [
+            'delivery_type' => Variant::DELIVERY_AUTO,
+            'price' => 20_000,
+        ]);
+        $this->fillStock($variant, ['akun1@contoh.test|Pass1']);
+
+        // Dua ulasan scrape (tanpa order_id) + satu ulasan pesanan.
+        foreach (['Pembeli Scrape A', 'Pembeli Scrape B'] as $nama) {
+            Review::query()->create([
+                'product_id' => $variant->product_id,
+                'external_id' => 'scrape-'.$nama,
+                'user_name' => $nama,
+                'rating' => 5,
+                'comment' => 'Ulasan hasil scrape',
+                'status' => Review::STATUS_APPROVED,
+            ]);
+        }
+
+        $this->withSession(['cart.items' => [$variant->id => 1]])
+            ->post(route('checkout.store'), $this->checkoutPayload());
+
+        $order = Order::query()->firstOrFail();
+
+        Review::query()->create([
+            'product_id' => $variant->product_id,
+            'order_id' => $order->id,
+            'user_name' => 'Pembeli Asli',
+            'rating' => 4,
+            'comment' => 'Ulasan pesanan',
+            'status' => Review::STATUS_APPROVED,
+        ]);
+
+        $this->assertSame(3, Review::query()->count());
+
+        $this->artisan('pesanan:bersihkan', ['--force' => true, '--with-reviews' => true])
+            ->assertSuccessful();
+
+        $this->assertSame(0, Review::query()->count(), 'ulasan scrape dan ulasan pesanan sama-sama dibuang');
+        $this->assertSame(0, Order::query()->count());
+
+        // Katalog tetap utuh.
+        $this->assertSame(1, DB::table('products')->count());
+        $this->assertSame(1, DB::table('variants')->count());
+    }
+
     public function test_tanpa_force_tidak_menghapus_apa_pun(): void
     {
         $variant = $this->makeVariant($this->makeProduct(), [
