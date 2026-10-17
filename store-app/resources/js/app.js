@@ -930,27 +930,71 @@ window.renderIcons = renderIcons;
  * `location.replace("login.html")`, sehingga pengunjung lama terlempar ke
  * halaman login padahal sedang membuka storefront.
  *
- * Kill-switch `public/sw.js` hanya jalan kalau browser memeriksa ulang SW.
- * Untuk pengunjung yang sudah tidak pernah menyentuh `/sw.js`, pembersihan ini
- * yang bekerja: lepas registrasi apa pun yang masih memegang origin ini, lalu
- * buang cache milik Aero. Toko sendiri tidak memakai service worker.
+ * Dua hal harus dibereskan, dan keduanya tidak bisa diperbaiki dari server:
+ *
+ *  1. Registrasi service worker lama — hanya bisa dilepas dari sisi klien.
+ *  2. Dokumen Aero yang masih di HTTP cache. Saat Aero hidup, nginx menyajikan
+ *     `index.html` sebagai berkas statis tanpa `Cache-Control`, jadi browser
+ *     memakai heuristic caching dan bisa menyajikan HTML lama berhari-hari.
+ *     Dokumen itu tetap memuat SPA Aero walau service worker-nya sudah hilang.
+ *
+ * Karena itu, kalau kita mendarat di `/login` akibat dilempar aplikasi lama,
+ * kita pulangkan pengunjung ke toko lewat URL ber-cache-buster (`?_r=`) supaya
+ * pasti diambil dari jaringan. Sekali per tab agar tidak berputar-putar.
  */
 function bersihkanSisaAplikasiLama() {
-    if (!('serviceWorker' in navigator)) return;
+    const diHalamanLogin = window.location.pathname === '/login';
+
+    // Referer `/` atau `login.html` berarti kita sampai di /login bukan karena
+    // sengaja membuka panel admin, melainkan karena dilempar aplikasi lama.
+    const dilemparAplikasiLama = (() => {
+        if (!diHalamanLogin || !document.referrer) return false;
+
+        try {
+            const asal = new URL(document.referrer);
+            if (asal.origin !== window.location.origin) return false;
+
+            return asal.pathname === '/' || asal.pathname === '/login.html';
+        } catch (e) {
+            return false;
+        }
+    })();
+
+    const pulangkanKeToko = () => {
+        if (!diHalamanLogin) return;
+
+        try {
+            if (sessionStorage.getItem('sisa_lama_dipulihkan')) return;
+            sessionStorage.setItem('sisa_lama_dipulihkan', '1');
+        } catch (e) {
+            return; // storage diblokir — jangan risiko loop
+        }
+
+        window.location.replace('/?_r=' + Date.now());
+    };
+
+    if (!('serviceWorker' in navigator)) {
+        if (dilemparAplikasiLama) pulangkanKeToko();
+        return;
+    }
 
     navigator.serviceWorker.getRegistrations().then((regs) => {
-        // Toko tidak punya service worker sama sekali. Jadi registrasi apa pun
-        // di origin ini pasti sisa aplikasi lama — lepas, lalu buang cache-nya.
-        if (!regs.length) return;
+        // Toko tidak punya service worker sama sekali, jadi registrasi apa pun
+        // di origin ini pasti sisa aplikasi lama.
+        if (regs.length) {
+            regs.forEach((reg) => reg.unregister().catch(() => {}));
 
-        regs.forEach((reg) => reg.unregister().catch(() => {}));
+            if (window.caches && caches.keys) {
+                caches.keys().then((keys) => {
+                    keys.forEach((key) => caches.delete(key).catch(() => {}));
+                }).catch(() => {});
+            }
+        }
 
-        if (!window.caches || !caches.keys) return;
-
-        caches.keys().then((keys) => {
-            keys.forEach((key) => caches.delete(key).catch(() => {}));
-        }).catch(() => {});
-    }).catch(() => {});
+        if (dilemparAplikasiLama) pulangkanKeToko();
+    }).catch(() => {
+        if (dilemparAplikasiLama) pulangkanKeToko();
+    });
 }
 
 bersihkanSisaAplikasiLama();
