@@ -24,3 +24,7 @@ store-app/storage/*.key
 store-app/database/database.sqlite
 store-app/.phpunit.cache/
 store-app/.phpunit.result.cache
+
+# Kredensial lokal — JANGAN pernah di-commit
+akun.txt
+*.credentials
