@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Memuat ulang toko…</title>
+    <style>
+        :root { color-scheme: light dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            background: #0b1220;
+            color: #e6edf7;
+            text-align: center;
+        }
+        .box { max-width: 26rem; }
+        .spinner {
+            width: 34px;
+            height: 34px;
+            margin: 0 auto 20px;
+            border: 3px solid rgba(230, 237, 247, 0.18);
+            border-top-color: #6ea8fe;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            .spinner { animation: none; }
+        }
+        h1 { margin: 0 0 10px; font-size: 1.05rem; font-weight: 600; }
+        p { margin: 0; font-size: 0.875rem; line-height: 1.6; color: #9fb0c9; }
+        a { color: #6ea8fe; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="spinner" aria-hidden="true"></div>
+        <h1>Memuat ulang halaman toko…</h1>
+        <p>
+            Halaman ini berasal dari aplikasi lama yang masih tersimpan di cache
+            browser Anda. Kami membersihkannya otomatis.
+        </p>
+        <noscript>
+            <p style="margin-top:16px">
+                JavaScript nonaktif. <a href="/">Klik di sini untuk membuka toko</a>.
+            </p>
+        </noscript>
+    </div>
+
+    <!--
+      Halaman pemulihan, bukan halaman login.
+
+      Origin ini dulu dipakai aplikasi lain (Aero) yang service worker-nya
+      menyimpan app shell di CacheStorage dan menjalankan
+      `location.replace("login.html")` saat sesinya gagal. Pengunjung yang
+      masih menyimpan cache lama karena itu mendarat di sini.
+
+      Tugas halaman ini HANYA memulihkan keadaan:
+        1. lepas semua service worker milik origin,
+        2. buang seluruh cache,
+        3. buka toko lewat URL ber-cache-buster supaya tidak dilayani entri
+           cache lama lagi.
+
+      Header `Clear-Site-Data: "cache", "storage"` dipasang oleh nginx untuk
+      file ini (lihat DEPLOY.md). Skrip sengaja inline: halaman statis ini
+      tidak melewati middleware CSP aplikasi, dan tidak memuat apa pun dari
+      jaringan sehingga tetap tampil walau aplikasi sedang bermasalah.
+    -->
+    <script>
+        (function () {
+            function done() {
+                // Cache-buster: entri cache lama terikat ke URL tanpa query,
+                // jadi URL baru ini pasti diambil dari jaringan.
+                window.location.replace('/?_r=' + Date.now());
+            }
+
+            var tugas = [];
+
+            try {
+                if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                    tugas.push(
+                        navigator.serviceWorker.getRegistrations().then(function (regs) {
+                            return Promise.all(regs.map(function (r) {
+                                return r.unregister();
+                            }));
+                        })
+                    );
+                }
+            } catch (e) { /* abaikan */ }
+
+            try {
+                if (window.caches && caches.keys) {
+                    tugas.push(
+                        caches.keys().then(function (keys) {
+                            return Promise.all(keys.map(function (k) {
+                                return caches.delete(k);
+                            }));
+                        })
+                    );
+                }
+            } catch (e) { /* abaikan */ }
+
+            // Jangan pernah menggantung: apa pun hasilnya, tetap lanjut.
+            Promise.all(tugas).then(done, done);
+            setTimeout(done, 1500);
+        })();
+    </script>
+</body>
+</html>

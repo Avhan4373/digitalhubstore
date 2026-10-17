@@ -921,3 +921,36 @@ document.addEventListener('DOMContentLoaded', () => {
 window.toast = toast;
 window.copyText = copyText;
 window.renderIcons = renderIcons;
+
+/**
+ * Bersihkan sisa aplikasi lama (Aero) dari browser pengunjung.
+ *
+ * Origin ini sebelumnya menyajikan aplikasi lain yang mendaftarkan service
+ * worker `/sw.js` dan menyimpan app shell di CacheStorage. SW itu menjalankan
+ * `location.replace("login.html")`, sehingga pengunjung lama terlempar ke
+ * halaman login padahal sedang membuka storefront.
+ *
+ * Kill-switch `public/sw.js` hanya jalan kalau browser memeriksa ulang SW.
+ * Untuk pengunjung yang sudah tidak pernah menyentuh `/sw.js`, pembersihan ini
+ * yang bekerja: lepas registrasi apa pun yang masih memegang origin ini, lalu
+ * buang cache milik Aero. Toko sendiri tidak memakai service worker.
+ */
+function bersihkanSisaAplikasiLama() {
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+        // Toko tidak punya service worker sama sekali. Jadi registrasi apa pun
+        // di origin ini pasti sisa aplikasi lama — lepas, lalu buang cache-nya.
+        if (!regs.length) return;
+
+        regs.forEach((reg) => reg.unregister().catch(() => {}));
+
+        if (!window.caches || !caches.keys) return;
+
+        caches.keys().then((keys) => {
+            keys.forEach((key) => caches.delete(key).catch(() => {}));
+        }).catch(() => {});
+    }).catch(() => {});
+}
+
+bersihkanSisaAplikasiLama();
