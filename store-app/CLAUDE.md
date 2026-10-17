@@ -1,5 +1,5 @@
 Lihat `AGENTS.md` di direktori ini — berisi konvensi dan aturan kerja untuk
-proyek DigitalHub Store.
+proyek Creative Solutions.
 
 Versi singkat:
 

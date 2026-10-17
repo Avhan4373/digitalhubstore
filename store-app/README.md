@@ -1,4 +1,4 @@
-# DigitalHub Store — aplikasi toko digital
+# Creative Solutions — aplikasi toko digital
 
 Aplikasi pengganti `https://digitalhubstore.my.id/` dengan fungsi yang sama
 (katalog → keranjang → checkout → pembayaran → pengiriman produk → ulasan)
@@ -48,8 +48,8 @@ Buka <http://localhost:8000>. Panel admin di <http://localhost:8000/admin>.
 
 | Role | Email | Password | Akses |
 |---|---|---|---|
-| Admin | `admin@digitalhubstore.test` | `password` | Semua, termasuk pengguna & pengaturan |
-| Staff | `staff@digitalhubstore.test` | `password` | Katalog, pesanan, ulasan, voucher, log |
+| Admin | `admin@creativesolutions.test` | `password` | Semua, termasuk pengguna & pengaturan |
+| Staff | `staff@creativesolutions.test` | `password` | Katalog, pesanan, ulasan, voucher, log |
 
 Ganti password lewat menu **Pengguna → Ubah** setelah login pertama.
 Akun default hanya dibuat oleh seeder — kalau `AdminUserSeeder` tidak dijalankan,

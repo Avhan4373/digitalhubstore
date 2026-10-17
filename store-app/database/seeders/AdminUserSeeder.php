@@ -12,9 +12,9 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $admin = User::updateOrCreate(
-            ['email' => 'admin@digitalhubstore.test'],
+            ['email' => 'admin@creativesolutions.test'],
             [
-                'name' => 'Admin DigitalHub',
+                'name' => 'Admin Creative Solutions',
                 'password' => Hash::make(env('ADMIN_SEED_PASSWORD', 'password')),
                 'role' => User::ROLE_ADMIN,
                 'is_active' => true,
@@ -23,7 +23,7 @@ class AdminUserSeeder extends Seeder
         );
 
         User::updateOrCreate(
-            ['email' => 'staff@digitalhubstore.test'],
+            ['email' => 'staff@creativesolutions.test'],
             [
                 'name' => 'Staff Toko',
                 'password' => Hash::make(env('STAFF_SEED_PASSWORD', 'password')),

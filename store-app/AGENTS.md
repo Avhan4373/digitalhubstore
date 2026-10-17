@@ -1,4 +1,4 @@
-# DigitalHub Store — catatan untuk agen
+# Creative Solutions — catatan untuk agen
 
 Aplikasi toko digital (pengganti `digitalhubstore.my.id`).
 Laravel 13 · Blade · MySQL 8 · Tailwind v4. **Tanpa Laravel Boost** — jangan

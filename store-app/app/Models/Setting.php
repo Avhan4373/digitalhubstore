@@ -27,7 +27,7 @@ class Setting extends Model
     public static function kunciBawaan(): array
     {
         return [
-            ['general', 'store_name', 'DigitalHub Store', 'string', 'Nama toko', false],
+            ['general', 'store_name', 'Creative Solutions', 'string', 'Nama toko', false],
             ['general', 'store_tagline', 'Akun premium resmi, bergaransi penuh', 'string', 'Tagline', false],
             ['general', 'store_whatsapp', '6282243890517', 'string', 'Nomor WhatsApp admin', false],
             ['general', 'store_email', '', 'string', 'Email toko', false],
