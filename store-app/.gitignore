@@ -26,13 +26,4 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# Data lokal/rahasia yang tidak boleh ikut repo
-/storage/app/public/products
-/storage/app/public/settings
-/storage/app/public/reviews
-/storage/app/private
-/storage/framework/cache/data/*
-/storage/framework/sessions/*
-/storage/framework/views/*
-/storage/logs/*
 /database/database.sqlite

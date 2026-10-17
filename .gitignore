@@ -9,7 +9,9 @@ data/*.sqlite-journal
 data/raw/
 data/export/
 
-# Laravel
+# Laravel: cukup andalkan .gitignore bersarang di store-app/.
+# JANGAN mengabaikan isi storage/* dari sini — file .gitignore bersarang
+# itulah yang membuat direktori framework/{sessions,views} & logs ikut ter-clone.
 store-app/vendor/
 store-app/node_modules/
 store-app/.env
@@ -19,12 +21,6 @@ store-app/public/build/
 store-app/public/hot
 store-app/public/storage
 store-app/storage/*.key
-store-app/storage/app/private/
-store-app/storage/app/public/
-store-app/storage/framework/cache/data/
-store-app/storage/framework/sessions/
-store-app/storage/framework/views/
-store-app/storage/logs/
 store-app/database/database.sqlite
 store-app/.phpunit.cache/
 store-app/.phpunit.result.cache
