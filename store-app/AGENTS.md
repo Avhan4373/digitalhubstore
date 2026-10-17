@@ -117,10 +117,46 @@ Dokumentasi utama ada di `README.md`. Analisis situs asal ada di
 - Modal supplier (`cost_price`) dan referensi supplier disalin ke `order_items`
   saat checkout — margin pesanan lama tidak boleh berubah saat varian diedit.
 
+## Bot WhatsApp (`bot-wa/`)
+
+Bot berjalan sebagai proses Node terpisah (whatsapp-web.js + Chrome) dan
+memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
+**tidak boleh** dilanggar:
+
+- **Harga/stok tetap di server.** Bot tidak boleh mengirim harga, diskon, atau
+  total. Semua lewat `OrderService::createFromLines()` — jalur yang sama dengan
+  checkout web (`createFromCart()` sekarang mendelegasikan ke situ).
+- **Token fail-closed.** `bot.enabled` bukan `true` atau `bot.token` kosong ⇒
+  `EnsureBotToken` membalas `503` untuk SEMUA route. Jangan mengubahnya menjadi
+  "lewati kalau kosong" — itu membuka katalog & pembuatan pesanan ke publik.
+- **Isi akun hanya setelah lunas + nomor cocok.** `BotController::orderStatus()`
+  membandingkan `wa_normalize(buyer_wa)` dengan nomor pengirim. Jangan
+  menambahkan pencarian lewat invoice saja, atau endpoint "isi akun" terpisah.
+- **Jangan kirim data internal.** `ringkasProduk()`/`ringkasVarian()` sengaja
+  tidak memuat `cost_price`, `supplier_*`, atau `margin`. Ada test regresi di
+  `BotApiTest` yang gagal kalau salah satu bocor.
+- **Respons tanpa cache.** `EnsureBotToken` memasang `Cache-Control: no-store`
+  karena respons bisa memuat kredensial.
+- **Logika bot harus tetap bisa diuji tanpa Chrome.** `src/core/*` murni
+  (parser, format, replies, engine); `src/adapters/whatsapp.js` satu-satunya
+  yang menyentuh Chrome. `npm test` memakai `fetch` tiruan — jangan menambah
+  ketergantungan jaringan di `src/core`.
+- **Nomor urut katalog harus satu sumber.** Daftar yang dirender `katalog()`
+  dan daftar yang dipakai `pilihProdukNomor()` sama-sama berasal dari
+  `batasiKatalog()` → `daftarProdukDatar()`; ada test yang mencocokkan nomor di
+  teks pesan dengan hasil pemilihan.
+- **Filter pesan wajib** (`core/wa-filter.js`): `fromMe`, `isStatus`,
+  `broadcast`, `@g.us`, `@broadcast`, `@newsletter`. Tanpa `broadcast` bot
+  membalas setiap pesan siaran.
+- **Chrome harus 146.** Chrome lebih baru (termasuk Flatpak) membuat inject
+  gagal (`Execution context was destroyed`). Pasang via `@puppeteer/browsers`.
+
 ## Perintah yang sering dipakai
 
 ```bash
-php artisan test                       # 76 test, SQLite in-memory
+php artisan test                       # 104 test, SQLite in-memory
+cd bot-wa && npm test                  # 52 test bot (tanpa Chrome)
+cd bot-wa && npm run simulate          # coba percakapan di terminal
 php artisan migrate:fresh --seed       # skema + katalog dari ../data/seed
 php artisan route:list --except-vendor
 npm run build                          # WAJIB setelah ubah view/CSS

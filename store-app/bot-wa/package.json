@@ -1,0 +1,22 @@
+{
+  "name": "creative-solutions-bot-wa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot WhatsApp Creative Solutions — katalog, order, QRIS, cek pesanan",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/*.test.js",
+    "simulate": "node scripts/simulate.js",
+    "cek": "node scripts/cek-api.js"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}

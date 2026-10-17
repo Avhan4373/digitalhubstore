@@ -346,6 +346,51 @@ Permintaan tanpa tanda tangan valid langsung dijawab `403`.
 
 ---
 
+## 4b. Bot WhatsApp
+
+Pembeli bisa mengetik `list` di WhatsApp dan bot mengirim katalog dari
+**database Laravel yang sama** — bukan katalog terpisah. Perubahan produk di
+panel admin langsung ikut.
+
+```
+WhatsApp → bot-wa (Node + whatsapp-web.js + Chrome) → /api/bot/* → MySQL
+```
+
+Bot **tidak pernah menghitung harga sendiri**: pembuatan pesanan lewat
+`OrderService` yang sama dengan checkout web, jadi tidak ada selisih harga
+antara web dan WhatsApp. Pesanan bot masuk ke database dengan
+`user_agent = whatsapp-bot`, muncul di panel admin, dan memotong stok.
+
+| Ketik | Hasil |
+|---|---|
+| `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog per kategori + rentang harga |
+| `1`, `2`, … | detail produk ke-N (deskripsi, garansi, semua paket) |
+| `1`, `2`, … (di layar detail) | pilih paket → tanya nama → data wajib → konfirmasi |
+| `ya` | pesanan dibuat + QRIS dikirim |
+| nama produk | cari produk |
+| `status` lalu nomor invoice | status + isi akun (**hanya kalau lunas dan nomor cocok**) |
+| `riwayat` | daftar pesanan dari nomor itu |
+| `bantuan` / `batal` | panduan admin / hentikan proses |
+
+Keamanan yang dijaga:
+
+- **Token fail-closed** — `BOT_ENABLED` bukan `true` atau `BOT_API_TOKEN`
+  kosong ⇒ semua route `/api/bot/*` menolak (`503`). Salah konfigurasi tidak
+  berubah menjadi endpoint terbuka.
+- **Isi akun hanya untuk pemiliknya** — endpoint status mencocokkan nomor
+  WhatsApp pembeli dan hanya mengembalikan `contents` kalau pesanan lunas.
+- **Data internal tidak ikut** — `cost_price`, `supplier_name`, dan referensi
+  supplier tidak pernah masuk respons bot (ada test regresinya).
+- **Tanpa cache** — respons bertanda `Cache-Control: no-store` karena bisa
+  memuat kredensial.
+- **Rate limit** dua lapis: `throttle:120,1` di route + penahan per nomor di
+  proses bot.
+
+Instalasi, konfigurasi, dan catatan operasional (Chrome 146, filter broadcast,
+sesi LocalAuth) ada di **`bot-wa/README.md`**.
+
+---
+
 ## 5. Tampilan storefront (meniru situs asal)
 
 Tampilan storefront sengaja dibuat **sama persis** dengan `digitalhubstore.my.id`.
@@ -469,15 +514,23 @@ Catatan tentang data hasil scrape:
 ## 8. Test
 
 ```bash
-php artisan test        # 76 test, 407 asersi
+php artisan test        # 104 test, 499 asersi (termasuk 22 test API bot)
+```
+
+Test bot WhatsApp juga bisa dijalankan tanpa Chrome sama sekali:
+
+```bash
+cd bot-wa && npm test   # 52 test: parser, format, filter WA, alur percakapan
 ```
 
 Cakupan: integritas checkout (harga/voucher/stok dihitung server, honeypot,
 data wajib pembeli), akses pesanan per-sesi (termasuk kunci isi akun), popup
 "cek transaksi" (hanya nomor invoice; tanpa isi akun; kontak tersamar), ulasan,
 akses admin & role staff, pengiriman otomatis/manual, webhook Tripay (termasuk
-signature salah), dan alur reseller manual (referensi supplier, modal → margin,
-snapshot order lama).
+signature salah), alur reseller manual (referensi supplier, modal → margin,
+snapshot order lama), dan API internal bot WhatsApp (token fail-closed, harga
+dihitung server, isi akun hanya keluar setelah lunas + nomor cocok, data
+internal seperti `cost_price`/supplier tidak ikut terkirim).
 
 Test memakai SQLite in-memory (`phpunit.xml`) dan meng-`migrate:fresh` sendiri,
 jadi tidak menyentuh database MySQL pengembangan.
@@ -503,7 +556,8 @@ idempoten, dan pemisahan hak akses admin vs staff.
 ```
 app/
   Http/Controllers/{Storefront,Admin,Auth,Webhook}/
-  Http/Middleware/{EnsureUserIsAdmin,SecurityHeaders}.php
+  Http/Controllers/Api/BotController.php   API internal bot WhatsApp
+  Http/Middleware/{EnsureUserIsAdmin,SecurityHeaders,EnsureBotToken}.php
   Models/            Category Product ProductImage Variant StockItem Coupon
                      Order OrderItem OrderDelivery Review Setting ActivityLog User
   Services/          Cart CouponService OrderService DeliveryService TripayService
@@ -517,6 +571,10 @@ resources/
   views/             layouts/ components/ storefront/ admin/ auth/
 public/images/logo.png  logo toko bawaan (sama dengan situs asal)
 routes/web.php       storefront + keranjang + checkout + webhook + /admin
+routes/api.php       /api/bot/* untuk proses bot (bearer token)
+bot-wa/              bot WhatsApp (Node + whatsapp-web.js) — lihat bot-wa/README.md
+  src/core/          parser, format, replies, engine, session, api (murni, teruji)
+  src/adapters/      whatsapp.js (Chrome, sesi, filter, retry kirim)
 docker-compose.yml   MySQL 8.4 (dhs-mysql, host port 3307)
 ```
 

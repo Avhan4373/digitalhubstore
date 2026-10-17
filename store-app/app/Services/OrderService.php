@@ -38,7 +38,52 @@ class OrderService
             throw ValidationException::withMessages(['cart' => 'Keranjang Anda kosong.']);
         }
 
-        $subtotal = (int) $items->sum('subtotal');
+        // Keranjang web berbasis session: qty + varian sudah tervalidasi di
+        // `Cart`, jadi di sini cukup diteruskan ke jalur yang sama dengan bot.
+        $lines = $items->map(fn (array $row) => [
+            'variant' => $row['variant'],
+            'qty' => (int) $row['qty'],
+        ])->all();
+
+        return $this->createFromLines($lines, $buyer, $paymentMethod, $couponCode, $requiredInfo);
+    }
+
+    /**
+     * Buat pesanan langsung dari daftar varian + qty, tanpa session.
+     *
+     * Dipakai bot WhatsApp (dan bisa dipakai kanal lain nanti). Semua
+     * perhitungan tetap di sini: harga dibaca dari database, stok dikunci
+     * dengan `lockForUpdate`, kupon divalidasi server. Bot tidak boleh
+     * mengirim harga sendiri.
+     *
+     * @param  array<int, array{variant: Variant|int, qty: int}>  $lines
+     * @param  array{name: string, whatsapp: string, email?: ?string, note?: ?string, source?: ?string}  $buyer
+     * @param  array<int, array<int, mixed>>  $requiredInfo
+     */
+    public function createFromLines(array $lines, array $buyer, string $paymentMethod, ?string $couponCode = null, array $requiredInfo = []): Order
+    {
+        if ($lines === []) {
+            throw ValidationException::withMessages(['cart' => 'Tidak ada produk yang dipesan.']);
+        }
+
+        // Normalisasi: varian boleh dikirim sebagai model atau id, dan qty
+        // selalu dibatasi ke batas keranjang supaya bot tidak bisa memesan 999.
+        $items = collect($lines)->map(function (array $line) {
+            $variant = $line['variant'] instanceof Variant
+                ? $line['variant']
+                : Variant::query()->with('product')->find($line['variant']);
+
+            return [
+                'variant' => $variant,
+                'qty' => max(1, min((int) $line['qty'], Cart::MAX_QTY_PER_ITEM)),
+            ];
+        })->filter(fn (array $row) => $row['variant'] instanceof Variant)->values();
+
+        if ($items->isEmpty()) {
+            throw ValidationException::withMessages(['cart' => 'Produk yang dipesan tidak ditemukan.']);
+        }
+
+        $subtotal = (int) $items->sum(fn (array $row) => $row['variant']->price * $row['qty']);
 
         return DB::transaction(function () use ($items, $buyer, $paymentMethod, $couponCode, $subtotal, $requiredInfo) {
             $coupon = null;
@@ -75,7 +120,7 @@ class OrderService
                 'order_status' => Order::STATUS_NEW,
                 'expires_at' => now()->addMinutes(Setting::orderTtlMinutes()),
                 'ip' => request()->ip(),
-                'user_agent' => mb_substr((string) request()->userAgent(), 0, 255),
+                'user_agent' => mb_substr((string) ($buyer['source'] ?? request()->userAgent()), 0, 255),
             ]);
 
             foreach ($items as $row) {
@@ -136,6 +181,7 @@ class OrderService
             ActivityLog::record('order.created', 'Pesanan '.$order->invoice_no.' dibuat', $order, [
                 'total' => $order->total,
                 'items' => $items->count(),
+                'channel' => $buyer['source'] ?? 'web',
             ]);
 
             return $order->load('items');
