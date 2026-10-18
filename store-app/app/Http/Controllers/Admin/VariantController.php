@@ -173,6 +173,8 @@ class VariantController extends Controller
             'cost_price' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             // satu label per baris, mis. "Player ID"
             'required_fields' => ['nullable', 'string', 'max:1000'],
+            // tampilan nama khusus bot WA, mis. "1 Bulan Famhead"
+            'bot_label' => ['nullable', 'string', 'max:60'],
         ], [
             'supplier_url.url' => 'Tautan supplier harus berupa URL http/https yang valid.',
         ]);
@@ -193,6 +195,7 @@ class VariantController extends Controller
 
         $data['delivery_links'] = $links ?: null;
         $data['required_fields'] = $required ?: null;
+        $data['bot_label'] = trim((string) ($data['bot_label'] ?? '')) ?: null;
         $data['original_price'] = $data['original_price'] ?? 0;
         $data['cost_price'] = $data['cost_price'] ?? 0;
         $data['payment_type'] = $data['payment_type'] ?? 'default';

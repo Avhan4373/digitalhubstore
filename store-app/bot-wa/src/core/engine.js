@@ -142,7 +142,8 @@ export function cariVarian(varian, kata) {
     const indeksBerisi = [];
 
     (varian || []).forEach((v, i) => {
-        const nama = String(v?.name || '').toLowerCase();
+        // Nama yang dilihat pembeli di layar detail = bot_label kalau ada.
+        const nama = String(v?.bot_label || v?.name || '').toLowerCase();
 
         if (nama === q) indeksPersis.push(i);
         else if (nama.includes(q)) indeksBerisi.push(i);

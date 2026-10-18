@@ -186,7 +186,11 @@ export function detailProduk(produk, varian) {
     const baris = [`*${escapeWa(produk.name).toUpperCase()}*`, ''];
 
     for (const v of varian) {
-        baris.push(`${escapeWa(v.name)} : *${angka(v.price)}*${v.purchasable ? '' : ' ❌'}`);
+        // Nama yang tampil di bot bisa dibedakan dari web lewat bot_label
+        // (server). Pesanan tetap dibuat berdasarkan id varian, jadi nama web
+        // tetap masuk order_items.
+        const nama = escapeWa(v.bot_label || v.name);
+        baris.push(`${nama} : *${angka(v.price)}*${v.purchasable ? '' : ' ❌'}`);
 
         for (const label of v.required_fields || []) {
             baris.push(`* ${hurufMiring(label)}`);

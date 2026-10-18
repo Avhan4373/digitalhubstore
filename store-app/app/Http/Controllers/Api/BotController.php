@@ -233,6 +233,7 @@ class BotController extends Controller
         return [
             'id' => $variant->id,
             'name' => $variant->name,
+            'bot_label' => (string) ($variant->bot_label ?: ''),
             'price' => (int) $variant->price,
             'original_price' => $variant->hasDiscount() ? (int) $variant->original_price : null,
             'stock' => $variant->requiresStock() ? $variant->availableStock() : null,

@@ -21,6 +21,8 @@ class Variant extends Model
         'delivery_type', 'delivery_instruction', 'delivery_links', 'description',
         'terms', 'payment_type', 'is_active', 'sort_order',
         'supplier_name', 'supplier_sku', 'supplier_url', 'cost_price', 'required_fields',
+        // tampilan nama khusus bot WA (kosong = pakai `name`)
+        'bot_label',
     ];
 
     protected function casts(): array

@@ -169,6 +169,14 @@
                                         <p class="hint">Pembeli wajib mengisinya saat checkout, lalu tampil di detail pesanan sebagai bekal pembelian ke supplier.</p>
                                     </div>
 
+                                    <div class="mt-3">
+                                        <label class="label">Label khusus bot WA (opsional)</label>
+                                        <input name="bot_label" type="text" class="field" maxlength="60"
+                                               value="{{ $variant->bot_label }}"
+                                               placeholder="mis. 1 Bulan Famhead">
+                                        <p class="hint">Nama paket yang tampil di bot WhatsApp. Kosong = pakai nama varian.</p>
+                                    </div>
+
                                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                                         <div>
                                             <label class="label">Urutan</label>
@@ -256,6 +264,11 @@
                                 <label class="label">Data wajib dari pembeli (satu per baris, maks. 5)</label>
                                 <textarea name="required_fields" rows="2" class="field" maxlength="1000"
                                           placeholder="mis.&#10;Player ID&#10;Zone ID"></textarea>
+                            </div>
+                            <div class="sm:col-span-3">
+                                <label class="label">Label khusus bot WA (opsional)</label>
+                                <input name="bot_label" type="text" class="field" maxlength="60"
+                                       placeholder="mis. 1 Bulan Famhead">
                             </div>
                         </div>
 
