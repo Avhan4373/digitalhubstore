@@ -115,18 +115,30 @@ async function kirim(teks, extra = {}) {
 
 // ------------------------------------------------------------------ katalog
 
-test('list menampilkan katalog dengan nomor urut', async () => {
+test('list menampilkan menu bergaya papan nama + sapaan/tanggal', async () => {
     const { replies } = await kirim('list');
 
     assert.equal(replies.length, 1);
     const teks = replies[0];
 
-    assert.match(teks, /Creative Solutions/);
-    assert.match(teks, /\*AI\*/);
-    assert.match(teks, /1\. Gemini Pro/);
-    assert.match(teks, /2\. Canva Pro/);
-    assert.match(teks, /3\. Netflix/);
-    assert.match(teks, /Rp5\.000 – Rp35\.000/);
+    assert.match(teks, /𝗟𝗜𝗦𝗧 𝗠𝗘𝗡𝗨 𝗦𝗧𝗢𝗥𝗘/);
+    assert.match(teks, /Tanggal : \d{1,2} \w+ 20\d{2}/);
+    assert.match(teks, /Jam : \d{2}:\d{2}:\d{2} WIB/);
+    assert.match(teks, /CREATIVE SOLUTIONS/);
+    assert.match(teks, /GEMINI PRO/);
+    assert.match(teks, /CANVA PRO/);
+    assert.match(teks, /NETFLIX/);
+    // Tanpa nomor urut: pembeli membalas nama layanan.
+    assert.doesNotMatch(teks, /^1\. /m);
+});
+
+test('balas nama layanan membuka detail produknya', async () => {
+    const { replies } = await kirim('canva pro');
+
+    assert.match(replies[0], /Canva Pro/);
+
+    const produkCall = panggilan.filter((p) => p.path.startsWith('/api/bot/produk/'));
+    assert.equal(produkCall.at(-1).path, '/api/bot/produk/canva-pro', '"canva pro" harus menunjuk Canva Pro');
 });
 
 test('angka setelah list membuka detail produk yang benar', async () => {
@@ -223,7 +235,7 @@ test('list bisa dipakai lagi dari layar pilih paket', async () => {
     await kirim('1');
 
     const katalogLagi = await kirim('list');
-    assert.match(katalogLagi.replies[0], /Creative Solutions/);
+    assert.match(katalogLagi.replies[0], /CREATIVE SOLUTIONS/);
 
     // State keluar: angka berikutnya membuka produk lagi.
     const detailLagi = await kirim('1');

@@ -5,9 +5,63 @@
  * Chrome maupun jaringan. Tidak ada angka yang dihitung ulang di sini: harga
  * dan stok datang dari API Laravel.
  */
-import { escapeWa, labelTerjual, potong, rentangHarga, rupiah } from './format.js';
+import { escapeWa, potong, rentangHarga, rupiah } from './format.js';
 
 const GARIS = '━━━━━━━━━━━━━━━';
+
+/**
+ * Nama hari/bulan Indonesia untuk header katalog.
+ * `Intl` dengan locale `id-ID` tersedia di Node 18+ tanpa data tambahan.
+ */
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const BULAN = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+
+/** "Selamat Siang 🌝" — pagi 🌅 / siang 🌝 / sore 🌆 / malam 🌙 (WIB). */
+export function sapaanWaktu(date = new Date()) {
+    const jamWIB = Number(
+        new Intl.DateTimeFormat('id-ID', {
+            hour: 'numeric',
+            hour12: false,
+            timeZone: 'Asia/Makassar',
+        }).format(date),
+    );
+
+    if (jamWIB >= 4 && jamWIB < 11) return 'Selamat Pagi 🌅';
+    if (jamWIB >= 10 && jamWIB < 15) return 'Selamat Siang 🌝';
+    if (jamWIB >= 15 && jamWIB < 19) return 'Selamat Sore 🌆';
+
+    return 'Selamat Malam 🌙';
+}
+
+/** Tanggal & jam WIB untuk header katalog, mis. "18 Oktober 2026" / "12:29:43 WIB". */
+export function tanggalWaktuWIB(date = new Date()) {
+    const pemformat = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Makassar',
+        weekday: 'short',
+        day: 'numeric',
+        month: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false,
+    });
+
+    const bagian = Object.fromEntries(
+        pemformat.formatToParts(date).map((p) => [p.type, p.value]),
+    );
+
+    const tanggal = `${bagian.day} ${BULAN[Number(bagian.month) - 1]} ${bagian.year}`;
+    const jam = `${bagian.hour}:${bagian.minute}:${bagian.second} WIB`;
+    const hari = HARI.find(
+        (h) => h.toLowerCase().startsWith(String(bagian.weekday || '').toLowerCase()),
+    ) || '';
+
+    return { tanggal, jam, hari };
+}
 
 /** Alias supaya pemanggil bisa memakai R.rupiahRange tanpa impor terpisah. */
 export const rupiahRange = rentangHarga;
@@ -63,34 +117,48 @@ export function bantuan(store) {
 }
 
 /**
- * Daftar katalog per kategori.
+ * Daftar katalog bergaya "LIST MENU STORE" — header sapaan + tanggal/jam WIB,
+ * lalu satu nama layanan per baris tanpa nomor urut. Pembeli membalas dengan
+ * NAMA layanan (mis. "netflix"); pencarian nama sudah ada di `engine.js`
+ * (`cariProduk`) dan teks hasil render tetap nama asli dari server.
+ *
  * @param {{name: string}} store
  * @param {Array<{name: string, products: Array}>} categories
+ * @param {object} [opsi]
+ * @param {Date} [opsi.sekarang] untuk uji: tanggal/jam tetap
  */
-export function katalog(store, categories) {
-    const baris = [`🛍️ *${store.name}*`, GARIS, ''];
-    let nomor = 0;
+export function katalog(store, categories, opsi = {}) {
+    const { tanggal, jam } = tanggalWaktuWIB(opsi.sekarang);
+    const namaRules = (opsi.namaToko || store.name || 'STORE').toUpperCase();
+
+    const baris = [
+        '「 𝗟𝗜𝗦𝗧 𝗠𝗘𝗡𝗨 𝗦𝗧𝗢𝗥𝗘 」',
+        'ᯤ.﹀﹀﹀﹀﹀﹀﹀﹀﹀.ᯤ',
+        `⊱┊ *${sapaanWaktu(opsi.sekarang)}*`,
+        `⊱┊ *Tanggal : ${tanggal}*`,
+        `⊱┊ *Jam : ${jam}*`,
+        '        ﹉﹉﹉﹉﹉﹉﹉﹉',
+    ];
 
     for (const kategori of categories) {
         const produk = kategori.products || [];
         if (produk.length === 0) continue;
 
-        baris.push(`*${escapeWa(kategori.name)}*`);
-
         for (const p of produk) {
-            nomor += 1;
-            baris.push(
-                `${nomor}. ${escapeWa(p.name)}`,
-                `    ${rentangHarga(p.price_min, p.price_max)}${p.sold_count > 0 ? ` • ${labelTerjual(p.sold_count)} terjual` : ''}`,
-            );
+            baris.push(`𐚁๋࣭⭑  ${escapeWa(p.name).toUpperCase()}`);
         }
-
-        baris.push('');
     }
 
-    baris.push('Ketik *nomor* produk untuk lihat paket.', 'Contoh: *1*');
+    baris.push(
+        '',
+        `⋆ 𝙍u𝙡e𝙨 *${escapeWa(namaRules)}*`,
+        'ⓘ 𝙠e𝙩i𝙠 𝙣a𝙢a 𝙡a𝙮a𝙣a𝙣 𝙙ia𝙩a𝙨',
+        'ⓘ 𝙙i𝙡a𝙧a𝙣g 𝙨p𝙖m 𝙗o𝙩',
+        `ⓘ 𝙩r𝙖n𝙨a𝙠𝙨i 𝙝a𝙣y𝙖 𝙠e𝙥a𝙙a 𝙖d𝙢i𝙣 𝙜r𝙤𝙪𝙥 *!*`,
+        'ⓘ 𝙨e𝙬a 𝙗o𝙩 𝙠e𝙩i𝙠 .𝙤w𝙣e𝙧',
+    );
 
-    return baris.join('\n').trim();
+    return baris.join('\n');
 }
 
 /**

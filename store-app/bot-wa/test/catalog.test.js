@@ -66,19 +66,23 @@ test('nomor di list menunjuk produk yang sama di daftar datar', () => {
     const katalog = katalogBuatan(3, 4);
     const terbatas = batasiKatalog(katalog, 7);
 
-    // Ambil nomor yang tertulis di pesan katalog.
-    const pesan = R.katalog(katalog.store, terbatas);
-    const nomorDiPesan = [...pesan.matchAll(/^(\d+)\. (.+)$/gm)].map((m) => ({
-        nomor: Number(m[1]),
-        nama: m[2],
-    }));
+    // Daftar yang dirender list (satu baris per produk, tanpa nomor) harus sama
+    // urutan dan sama isi dengan `daftarProdukDatar` yang dipakai pencarian —
+    // "nomor" pembeli sekarang adalah NAMA layanan, jadi kecocokannya diuji
+    // lewat nama.
+    const pesan = R.katalog(katalog.store, terbatas, { sekarang: new Date('2026-10-18T05:29:43Z') });
+    const namaDiPesan = [...pesan.matchAll(/^𐚁๋࣭⭑  (.+)$/gm)].map((m) => m[1]);
 
     const datar = daftarProdukDatar(terbatas);
 
-    assert.equal(nomorDiPesan.length, datar.length);
+    assert.equal(namaDiPesan.length, datar.length);
 
-    for (const { nomor, nama } of nomorDiPesan) {
-        assert.equal(datar[nomor - 1].name, nama, `nomor ${nomor} harus ${nama}`);
+    for (const [i, nama] of namaDiPesan.entries()) {
+        assert.equal(
+            datar[i].name.toUpperCase(),
+            nama,
+            `baris ${i + 1} harus ${datar[i].name}`,
+        );
     }
 });
 

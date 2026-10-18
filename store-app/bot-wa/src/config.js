@@ -112,7 +112,7 @@ export const config = {
      * produk; satu pesan sepanjang itu tidak terbaca di ponsel. Produk di luar
      * batas tetap bisa dicari lewat nama.
      */
-    batasProduk: Math.max(1, Number(process.env.BOT_MAX_PRODUCTS || 40)),
+    batasProduk: Math.max(1, Number(process.env.BOT_MAX_PRODUCTS || 50)),
 };
 
 /** Validasi tambahan yang butuh beberapa nilai sekaligus. */
