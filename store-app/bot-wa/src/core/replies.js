@@ -520,3 +520,35 @@ export function fallback() {
         '• *bantuan* — hubungi admin',
     ].join('\n');
 }
+
+/**
+ * `*pay*` yang diketik sebelum produk dipilih: arahkan ke katalog dulu.
+ * Bot tidak mengirim QRIS sebelum ada pesanan yang dibangun, supaya `pay`
+ * tidak jadi pintas ke info bayar tanpa konteks order.
+ */
+export function mintaPilihProdukDulu() {
+    return [
+        '🔹 Belum ada produk yang dipilih.',
+        '',
+        'Ketik *list* untuk melihat katalog, lalu pilih nama layanannya.',
+        'Setelah membuka detail & memilih paket, QRIS akan dikirim otomatis.',
+    ].join('\n');
+}
+
+/**
+ * Bukti transfer yang dikirim oleh pembeli yang **belum punya pesanan
+ * yang sedang dibayar** — ditolak supaya admin tidak dapat notifikasi palsu.
+ *
+ * Kirim ke DM pengirim (bukan ke grup) agar pesan ini tidak mengganggu anggota
+ * grup lain. Di grup, nomor pengirim biasanya belum bisa dikonversi jadi nomor
+ * HP (@lid), jadi validasi ini biasanya hanya berlaku di chat pribadi.
+ */
+export function buktiTidakValid() {
+    return [
+        '⚠️ *Bukti transfer tidak dikenali.*',
+        '',
+        'Saya tidak menemukan pesanan yang sedang dibayar di nomor ini.',
+        '',
+        'Pilih produk dulu lewat *list*, baru kirim bukti setelah checkout.',
+    ].join('\n');
+}

@@ -192,6 +192,58 @@ function isBukti(ctx, aksi) {
 }
 
 /**
+ * Apakah nomor ini punya pesanan yang sedang dibayar (pending / belum lunas)?
+ *
+ * Dipakai validasi bukti transfer: hanya pembeli yang memang punya order
+ * pending boleh mengirim bukti — supaya user lain (user2) yang belum order
+ * tidak memicu notifikasi palsu ke admin.
+ *
+ * - `true`  : ada order pending -> bukti diterima, bot diam.
+ * - `false` : tidak ada order pending -> bukti ditolak, bot memberi tahu pembeli.
+ * - `null`  : belum bisa validasi (nomor LID belum jadi nomor HP, atau API gagal)
+ *            -> tetap perlakukan sebagai bukti (bot diam, admin cek manual).
+ */
+async function buktiValid(nomor) {
+    if (!nomor || !nomorValid(nomor)) return null;
+
+    try {
+        const { orders } = await api.orderHistory(nomor);
+
+        return (orders || []).some(
+            (o) =>
+                !o.is_paid &&
+                o.can_pay !== false &&
+                !['cancelled', 'failed', 'expired'].includes(o.order_status),
+        );
+    } catch {
+        // API gagal: jangan false (bisa menolak pembeli yang akan bayar),
+        // dan jangan true (bisa menerima notifikasi palsu). null = biarkan
+        // bot diam dan admin yang cek manual.
+        return null;
+    }
+}
+
+/**
+ * Jawaban untuk sebuah bukti transfer (gambar atau teks kata kunci).
+ * Bot tidak membalas pembeli yang punya order pending (`bukti: true`), tapi
+ * menolak balasan ke DM bila tidak ada order pending — agar tidak membanjiri
+ * admin notifikasi palsu.
+ */
+async function buktiAtauTolak(nomor) {
+    const valid = await buktiValid(nomor);
+
+    if (valid === null) {
+        return { replies: [], bukti: true };
+    }
+
+    if (valid === false) {
+        return { replies: [R.buktiTidakValid()] };
+    }
+
+    return { replies: [], bukti: true };
+}
+
+/**
  * Titik masuk utama.
  *
  * @param {object} params
@@ -297,8 +349,13 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Gambar selalu dianggap bukti transfer, apa pun teksnya (bisa kosong).
     // Bot TIDAK membalas: verifikasi pembayaran dilakukan admin secara manual,
     // dan pembeli baru mendengar kabar lewat perintah admin `proses`/`done`.
+    //
+    // Tapi bukti hanya DITERIMA dari pembeli yang punya pesanan pending — supaya
+    // user lain (mis. user2) yang belum order tidak mengirimkan notifikasi
+    // palsu ke admin. Validasi ada di `buktiAtauTolak()`. Gambar di-cek PERTAMA
+    // sebelum perintah lain supaya "gambar + proses" tetap dianggap bukti.
     if (ctx.hasMedia) {
-        return { replies: [], bukti: true };
+        return buktiAtauTolak(nomor);
     }
 
     // ---------------------------------------------------------------- global
@@ -378,6 +435,13 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Dikirim sebagai SATU pesan: gambar QRIS dengan teksnya sebagai caption,
     // supaya kalimat "QRIS diatas" menunjuk ke gambar di pesan itu sendiri.
     if (aksi.type === 'pay') {
+        // Validasi: `pay` hanya berlaku saat sudah dalam alur order (produk
+        // sudah dipilih). Kalau belum ada state, arahkan ke katalog supaya
+        // tidak kirim QRIS tanpa konteks pesanan.
+        if (!state?.tahap) {
+            return { replies: [R.mintaPilihProdukDulu()] };
+        }
+
         clearState(chatId);
         const data = await ambilKatalog();
         const gambar = config.qrisLokal || data.store.qris_url || null;
@@ -421,9 +485,11 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // ---------------------------------------------------------- bukti transfer
     // Diperiksa sebelum pencarian: "sudah transfer" bukan nama produk. Sama
     // seperti gambar, pesan ini TIDAK dibalas bot — admin yang mengabari
-    // pembeli lewat `proses`/`done` setelah mengecek pembayaran.
+    // pembeli lewat `proses`/`done` setelah mengecek pembayaran. Validasi
+    // order pending juga diterapkan (`buktiAtauTolak`), jadi pembeli yang belum
+    // order tidak bisa mengirim notifikasi palsu.
     if (isBukti(ctx, aksi)) {
-        return { replies: [], bukti: true };
+        return buktiAtauTolak(nomor);
     }
 
     // -------------------------------------------------------------- pencarian

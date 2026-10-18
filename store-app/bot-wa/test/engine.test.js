@@ -368,7 +368,10 @@ test('pembeli (bukan admin) mengetik proses tidak dapat pengumuman transaksi', a
 
 // ------------------------------------------------------------- info pembayaran
 
-test('pay menampilkan nomor owner resmi + QRIS resmi dalam SATU pesan', async () => {
+test('pay setelah pilih produk: kirim QRIS resmi (gambar + caption satu pesan)', async () => {
+    await kirim('list');
+    await kirim('1');
+
     const hasil = await kirim('pay');
     const teks = hasil.qrisCaption || '';
 
@@ -396,6 +399,14 @@ test('pay tanpa gambar QRIS tetap mengirim teks + peringatan', async () => {
     assert.match(teks, /Gambar QRIS belum diatur admin/);
 });
 
+
+test("pay sebelum pilih produk -> arahkan pilih dulu", async () => {
+    const hasil = await kirim("pay");
+    assert.equal(hasil.qris, undefined);
+    assert.equal(hasil.qrisDulu, undefined);
+    assert.match(hasil.replies[0], /Belum ada produk yang dipilih/);
+});
+
 test('pencarian banyak hasil menampilkan pilihan', async () => {
     const { replies } = await kirim('pro');
     assert.match(replies[0], /Hasil pencarian/);
@@ -420,11 +431,7 @@ test('kirim bukti transfer (gambar): bot DIAM, tidak ada balasan', async () => {
 
     assert.deepEqual(hasil.replies, [], 'tidak boleh ada balasan apa pun');
     assert.equal(hasil.bukti, true);
-    assert.equal(
-        panggilan.length,
-        0,
-        'bot tidak perlu menanyakan pesanan ke API — admin yang mengecek manual',
-    );
+    assert.ok(panggilan.some((p) => p.path === '/api/bot/pesanan/riwayat'), 'validasi bukti cek order pending via orderHistory');
 });
 
 test('kirim bukti transfer (teks): bot DIAM, tidak ada balasan', async () => {
@@ -463,6 +470,22 @@ test('notifikasi bukti ke admin: chat pribadi tanpa pesanan dikenali', () => {
     assert.match(teks, /👤 Pembeli/);
     assert.match(teks, /💬 Chat pribadi/);
     assert.doesNotMatch(teks, /🧾/);
+});
+
+test("bukti dari nomor tanpa order pending -> ditolak, tidak ke admin", async () => {
+    stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
+    engine.resetRateLimit("628999888777");
+
+    const hasil = await engine.handlePesan({
+        teks: "sudah transfer",
+        nomor: "628999888777",
+        chatId: "dm-u2",
+        nama: "User Dua",
+    });
+
+    assert.equal(hasil.bukti, undefined, "bukan notifikasi ke admin");
+    assert.match(hasil.replies[0], /pesanan yang sedang dibayar/);
+    assert.ok(panggilan.some((p) => p.path === "/api/bot/pesanan/riwayat"));
 });
 
 // Regression: notifikasi TRANSAKSI PENDING/DONE cukup sampai catatan, tidak
