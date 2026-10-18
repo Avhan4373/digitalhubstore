@@ -170,7 +170,7 @@ async function beritahuAdmin(order) {
     }
 }
 
-async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup = '', buktiGambar = null }) {
+async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup = '', dariGrup = false, buktiGambar = null }) {
     // Allowlist: kalau diisi, hanya nomor itu yang dilayani. Berguna saat
     // mencoba bot di produksi tanpa mengganggu pembeli sungguhan.
     if (config.allowlist.length > 0 && !config.allowlist.includes(nomor)) {
@@ -186,6 +186,7 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
             nama,
             hasMedia,
             grup,
+            dariGrup,
             transaksiTerakhir: transaksiTerakhir.get(chatId) || null,
             batasRate: config.rateLimitPerMinute,
         });
@@ -216,6 +217,48 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
                 + '— DITOLAK: nomor ini belum punya pesanan di server. '
                 + 'Pembeli diberi arahan memilih produk; admin tidak dikabari.',
             );
+        }
+
+        // Admin menutup/membuka grup (fitur WhatsApp "announcement").
+        // Perubahan setelan dilakukan adapter; engine hanya memberi perintah.
+        if (hasil.aturGrup) {
+            const { buka, namaGrup } = hasil.aturGrup;
+
+            log.info(
+                `Admin ${maskNumber(nomor)} meminta ${buka ? 'MEMBUKA' : 'MENUTUP'} grup `
+                + `"${namaGrup || chatId}".`,
+            );
+
+            let berhasil = false;
+            let alasan = '';
+
+            try {
+                berhasil = await adapter.aturGrup(chatId, { buka });
+            } catch (e) {
+                alasan = e.message;
+            }
+
+            if (!berhasil) {
+                log.warn(
+                    `Gagal ${buka ? 'membuka' : 'menutup'} grup ${namaGrup || chatId}`
+                    + `${alasan ? `: ${alasan}` : ' — bot mungkin bukan admin grup.'}`,
+                );
+
+                await adapter.kirim(chatId, R.grupBotBukanAdmin(), { balasId: pesanId });
+                return;
+            }
+
+            log.info(`Grup ${namaGrup || chatId} berhasil ${buka ? 'DIBUKA' : 'DITUTUP'}.`);
+
+            // Konfirmasi dikirim SETELAH setelan berubah, supaya pesan ini
+            // sendiri tidak ikut terblokir saat grup baru saja ditutup.
+            await adapter.kirim(
+                chatId,
+                buka ? R.grupDibuka(namaGrup) : R.grupDitutup(namaGrup),
+                { balasId: pesanId },
+            );
+
+            return;
         }
 
         // Kirim ke CHAT ASAL (adapter yang menyelesaikan tujuan per chat) dan

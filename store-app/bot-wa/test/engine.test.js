@@ -501,6 +501,74 @@ test("bukti dari nomor dengan pesanan lunas tetap diteruskan ke admin", async ()
     assert.deepEqual(hasil.replies, []);
 });
 
+// ------------------------------------------------------- atur grup (admin)
+
+test('admin ketik "tutup grup" di grup -> perintah aturGrup terkirim', async () => {
+    const hasil = await kirim('tutup grup', {
+        grup: 'DIGITALHUB OFFICIAL',
+        dariGrup: true,
+    });
+
+    assert.deepEqual(hasil.replies, [], 'setelan grup diubah oleh adapter, bukan teks');
+    assert.deepEqual(hasil.aturGrup, {
+        buka: false,
+        chatId: 'chat-uji',
+        namaGrup: 'DIGITALHUB OFFICIAL',
+    });
+});
+
+test('admin ketik "buka grup" di grup -> perintah buka terkirim', async () => {
+    const hasil = await kirim('buka grup', {
+        grup: 'DIGITALHUB OFFICIAL',
+        dariGrup: true,
+    });
+
+    assert.equal(hasil.aturGrup.buka, true);
+    assert.equal(hasil.aturGrup.namaGrup, 'DIGITALHUB OFFICIAL');
+});
+
+test('"tutup grup" dari chat pribadi ditolak dengan penjelasan', async () => {
+    const hasil = await kirim('tutup grup');
+
+    assert.equal(hasil.aturGrup, undefined);
+    assert.match(hasil.replies[0], /harus diketik \*di dalam grup\*/);
+});
+
+test('pembeli (bukan admin) tidak bisa menutup grup', async () => {
+    engine.resetRateLimit('628111000222');
+
+    const hasil = await engine.handlePesan({
+        teks: 'tutup grup',
+        nomor: '628111000222',
+        chatId: 'grup-uji',
+        nama: 'Pembeli',
+        grup: 'DIGITALHUB OFFICIAL',
+        dariGrup: true,
+    });
+
+    assert.equal(hasil.aturGrup, undefined, 'pembeli tidak boleh mengubah setelan grup');
+    // Diperlakukan sebagai pencarian produk biasa, bukan perintah admin.
+    assert.ok(Array.isArray(hasil.replies));
+});
+
+test('perintah grup tidak mengganggu alur belanja pembeli', async () => {
+    // Pembeli (bukan admin) di grup: "tutup grup" bukan nama produk, jadi
+    // diperlakukan sebagai pencarian biasa — bukan perintah admin.
+    engine.resetRateLimit('628111000333');
+
+    const hasil = await engine.handlePesan({
+        teks: 'tutup grup',
+        nomor: '628111000333',
+        chatId: 'grup-uji2',
+        nama: 'Pembeli',
+        grup: 'DIGITALHUB OFFICIAL',
+        dariGrup: true,
+    });
+
+    assert.equal(hasil.aturGrup, undefined);
+    assert.match(hasil.replies[0], /tidak ditemukan/i);
+});
+
 // Regression: notifikasi TRANSAKSI PENDING/DONE cukup sampai catatan, tidak
 // ada kalimat penutup "Terima kasih sudah order!" lagi.
 test('transaksi proses: cukup sampai catatan, tidak ada Terima kasih', async () => {

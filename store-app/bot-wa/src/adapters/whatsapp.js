@@ -717,6 +717,7 @@ export function buatAdapterWhatsApp(handler) {
                 hasMedia,
                 pesanId,
                 grup,
+                dariGrup,
                 buktiGambar,
             });
         } catch (e) {
@@ -738,6 +739,28 @@ export function buatAdapterWhatsApp(handler) {
 
         async kirimMedia(chatId, sumber, caption, opsi = {}) {
             return antre(chatId, () => kirimGambar(chatId, sumber, caption, opsi));
+        },
+
+        /**
+         * Tutup/buka grup memakai setelan WhatsApp "announcement".
+         *
+         * `tutup` = hanya admin yang boleh mengirim pesan; `buka` = semua
+         * anggota boleh. Mengembalikan `true` kalau berhasil.
+         *
+         * WhatsApp menolak perubahan ini kalau bot bukan admin grup — hasil
+         * `false` dipakai pemanggil untuk memberi tahu admin, bukan dianggap
+         * error.
+         */
+        async aturGrup(chatId, { buka = false } = {}) {
+            const chat = await client.getChatById(chatId);
+
+            // whatsapp-web.js hanya punya GroupChat untuk chat grup; kalau
+            // ternyata bukan grup, jangan lanjut.
+            if (typeof chat?.setMessagesAdminsOnly !== 'function') {
+                throw new Error('Chat ini bukan grup WhatsApp.');
+            }
+
+            return chat.setMessagesAdminsOnly(!buka);
         },
 
         async berhenti() {

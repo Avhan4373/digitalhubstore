@@ -26,6 +26,20 @@ const ALIAS = {
 const ADMIN_PENDING = ['proses', 'pending', 'diproses'];
 const ADMIN_DONE = ['done', 'selesai', 'berhasil'];
 
+/**
+ * Perintah admin untuk mengatur grup (fitur WhatsApp "announcement").
+ * Ditulis persis seperti ini — tidak menerima catatan tambahan.
+ * Hanya dilayani untuk nomor admin DAN hanya di dalam grup (lihat route()).
+ */
+const ADMIN_GRUP_TUTUP = [
+    'tutup grup', 'tutupgroup', 'tutup grub', 'tutupgrub',
+    'close group', 'closegroup', 'grup tutup', 'grup close',
+];
+const ADMIN_GRUP_BUKA = [
+    'buka grup', 'bukagroup', 'buka grub', 'bukagrub',
+    'open group', 'opengroup', 'grup buka', 'grup open',
+];
+
 function normalisasi(text) {
     return String(text || '')
         .trim()
@@ -102,6 +116,18 @@ export function parsePesan(teks) {
             type: ADMIN_DONE.includes(kunciAdmin) ? 'admin_done' : 'admin_proses',
             catatan: sisaKata.join(' ').trim(),
         });
+    }
+
+    // 2b. Perintah admin mengatur grup: "tutup grup" / "buka grup".
+    //     Dicocokkan pada SELURUH teks (bukan kata pertama) karena perintahnya
+    //     dua kata. Harus dicek sebelum pencarian produk, kalau tidak
+    //     "tutup grup" akan dianggap nama produk yang tidak ada.
+    if (ADMIN_GRUP_TUTUP.includes(teks2)) {
+        return bungkus({ type: 'admin_tutup_grup' });
+    }
+
+    if (ADMIN_GRUP_BUKA.includes(teks2)) {
+        return bungkus({ type: 'admin_buka_grup' });
     }
 
     // 3. Perintah teks

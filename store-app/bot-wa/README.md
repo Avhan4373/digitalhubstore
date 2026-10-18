@@ -87,6 +87,7 @@ ditanyakan sebelum pesanan dibuat.
 | `riwayat` | daftar pesanan dari nomor ini |
 | `bantuan` / `cs` | panduan + tautan admin |
 | `batal` | batalkan proses berjalan |
+| `tutup grup` / `buka grup` | **khusus admin, hanya di dalam grup**: tutup grup = hanya admin yang bisa kirim pesan (WhatsApp *announcement*), buka grup = semua anggota bisa chat lagi |
 
 Pesanan yang dibuat bot **masuk ke database Laravel**, jadi muncul di panel
 admin, memotong stok, dan mengikuti aturan yang sama dengan pesanan web.
@@ -143,6 +144,26 @@ Pesan hanya berisi ringkasan ini — cukup sampai catatan, tidak ada kalimat pen
 - Bot **tidak** mengubah status pesanan; verifikasi tetap dilakukan admin di
   panel. Pesan ini hanya pengumuman ke pembeli.
 - Percakapan pembeli yang sedang berjalan di chat itu **tidak** dihapus.
+
+## Perintah admin `tutup grup` / `buka grup`
+
+Admin mengetik di **dalam grup** yang ingin diatur:
+
+| Ketik | Hasil |
+|---|---|
+| `tutup grup` (juga `close group`) | grup jadi *announcement*: hanya admin yang bisa kirim pesan |
+| `buka grup` (juga `open group`) | semua anggota bisa kirim pesan lagi |
+
+- **Bot harus jadi admin grup.** WhatsApp menolak perubahan setelan dari
+  non-admin; kalau begitu, bot membalas bahwa ia belum admin (bukan gagal diam).
+- **Hanya di dalam grup.** Di chat pribadi bot tidak tahu grup mana yang
+  dimaksud, jadi perintahnya ditolak dengan penjelasan — tidak menebak.
+- **Hanya nomor admin** (`BOT_ADMIN_NUMBERS`). Pembeli yang mengetik kata ini
+  diperlakukan sebagai pencarian produk biasa.
+- Grup juga harus dilayani bot (terdaftar di `BOT_GROUP_ALLOWLIST`); grup lain
+  tetap diabaikan seluruhnya.
+- Konfirmasi dikirim ke grup **setelah** setelan berubah, supaya pesan
+  konfirmasi sendiri tidak ikut terblokir saat grup baru ditutup.
 
 ## Notifikasi pesanan selesai
 
@@ -224,7 +245,7 @@ memakai nomor WhatsApp pengirim yang sebenarnya.
 Seluruh alur bisa diuji tanpa Chrome dan tanpa scan QR:
 
 ```bash
-npm test          # 94 test: parser, format, filter WA, katalog, alur percakapan
+npm test          # 99 test: parser, format, filter WA, katalog, alur percakapan
 npm run simulate  # coba percakapan langsung di terminal
 npm run cek       # periksa token + katalog ke Laravel (tanpa kirim pesan)
 ```

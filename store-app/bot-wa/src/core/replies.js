@@ -534,3 +534,59 @@ export function buktiTidakValid() {
         'Pilih produk dulu lewat *list*, baru kirim bukti setelah checkout.',
     ].join('\n');
 }
+
+// ------------------------------------------------------------ atur grup (admin)
+
+/**
+ * Konfirmasi grup berhasil DITUTUP (hanya admin yang bisa mengirim pesan).
+ * Dikirim ke grup itu sendiri supaya anggota tahu kenapa mereka tidak bisa chat.
+ */
+export function grupDitutup(namaGrup = '') {
+    return [
+        '🔒 *GRUP DITUTUP*',
+        '',
+        ...(namaGrup ? [`📂 Grup    : ${namaGrup}`] : []),
+        'Mulai sekarang hanya admin yang bisa mengirim pesan di grup ini.',
+        '',
+        'Ada pertanyaan? Hubungi admin lewat chat pribadi.',
+    ].join('\n');
+}
+
+/** Konfirmasi grup dibuka kembali untuk semua anggota. */
+export function grupDibuka(namaGrup = '') {
+    return [
+        '🔓 *GRUP DIBUKA*',
+        '',
+        ...(namaGrup ? [`📂 Grup    : ${namaGrup}`] : []),
+        'Semua anggota sudah bisa mengirim pesan lagi.',
+    ].join('\n');
+}
+
+/**
+ * Perintah tutup/buka grup ditolak karena bot bukan admin grup.
+ *
+ * WhatsApp hanya mengizinkan admin mengubah pengaturan grup; kalau bot belum
+ * dijadikan admin, perubahannya gagal dan admin perlu tahu alasannya — bukan
+ * sekadar "gagal".
+ */
+export function grupBotBukanAdmin() {
+    return [
+        '⚠️ *Tidak bisa mengubah pengaturan grup.*',
+        '',
+        'Bot belum menjadi admin di grup ini.',
+        '',
+        'Jadikan nomor bot sebagai admin grup, lalu ulangi perintahnya.',
+    ].join('\n');
+}
+
+/**
+ * Perintah tutup/buka grup diketik di chat pribadi, bukan di dalam grup.
+ * Grup mana yang dimaksud tidak bisa ditebak dengan aman.
+ */
+export function grupHanyaDiDalamGrup() {
+    return [
+        '⚠️ Perintah ini harus diketik *di dalam grup* yang ingin diatur.',
+        '',
+        'Buka grupnya, lalu kirim *tutup grup* atau *buka grup* di sana.',
+    ].join('\n');
+}

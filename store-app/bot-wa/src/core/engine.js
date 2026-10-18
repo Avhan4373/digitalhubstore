@@ -256,6 +256,7 @@ export async function handlePesan({
     nama = '',
     hasMedia = false,
     grup = '',
+    dariGrup = false,
     transaksiTerakhir = null,
 }) {
     const nomorBersih = normalisasiNomor(nomor);
@@ -275,6 +276,9 @@ export async function handlePesan({
         teks: String(teks || ''),
         /** Nama grup WhatsApp (kosong kalau chat pribadi). */
         grup,
+        /** Apakah pesan datang dari grup. Nama grup bisa kosong, jadi ini
+         *  penanda yang bisa diandalkan untuk perintah atur grup. */
+        dariGrup,
         /** Pesanan terakhir yang dibuat bot di chat ini (lihat index.js). */
         transaksiTerakhir,
         /** Perintah `proses`/`done` hanya untuk nomor admin. */
@@ -388,6 +392,30 @@ async function route(aksi, state, chatId, nomor, ctx) {
         if (ctx.admin) return notifikasiTransaksi(aksi, ctx);
 
         aksi = { ...aksi, type: 'cari', kata: aksi.teks };
+    }
+
+    // ---------------------------------------------------- atur grup (admin)
+    // `tutup grup` / `buka grup` memakai fitur WhatsApp "announcement": saat
+    // ditutup hanya admin yang bisa mengirim pesan. Bot harus jadi admin grup.
+    //
+    // Perintah ini HANYA berlaku di dalam grup yang bersangkutan — di chat
+    // pribadi bot tidak tahu grup mana yang dimaksud, jadi tidak ditebak.
+    // Pembeli yang mengetik kata ini diperlakukan sebagai pencarian biasa.
+    if (aksi.type === 'admin_tutup_grup' || aksi.type === 'admin_buka_grup') {
+        const buka = aksi.type === 'admin_buka_grup';
+
+        if (!ctx.admin) {
+            aksi = { ...aksi, type: 'cari', kata: aksi.teks };
+        } else if (!ctx.dariGrup) {
+            return { replies: [R.grupHanyaDiDalamGrup()] };
+        } else {
+            // Adapter yang benar-benar mengubah setelan grup (butuh Chrome);
+            // engine hanya memutuskan apa yang harus dikerjakan.
+            return {
+                replies: [],
+                aturGrup: { buka, chatId, namaGrup: ctx.grup || '' },
+            };
+        }
     }
 
     // --------------------------------------------- state yang menunggu isian
