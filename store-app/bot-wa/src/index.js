@@ -109,6 +109,27 @@ async function kirimHasil(chatId, hasil, balasId = null) {
     }
 }
 
+/**
+ * Kabari admin bahwa ada bukti transfer masuk.
+ *
+ * Bot DIAM ke pembeli (lihat `hasil.bukti`): verifikasi manual oleh admin, dan
+ * pembeli baru dikabari lewat perintah admin `proses`/`done`. Notifikasi ini
+ * dikirim ke chat PRIBADI tiap nomor di `BOT_ADMIN_NUMBERS`.
+ */
+async function beritahuBukti({ nomor, nama, grup, transaksi }) {
+    if (config.adminNumbers.length === 0) return;
+
+    const pesan = R.buktiMasuk({ nama, nomor, grup, transaksi });
+
+    for (const nomorAdmin of config.adminNumbers) {
+        try {
+            await adapter.kirim(`${nomorAdmin}@c.us`, pesan);
+        } catch (e) {
+            log.warn(`Notifikasi bukti ke admin ${maskNumber(nomorAdmin)} gagal: ${e.message}`);
+        }
+    }
+}
+
 /** Beri tahu admin bahwa ada pesanan baru dari bot. */
 async function beritahuAdmin(order) {
     if (config.adminNumbers.length === 0) return;
@@ -156,13 +177,21 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
 
         if (hasil.order) catatPesanan(chatId, hasil.order);
 
-        // Bukti transfer: bot sengaja DIAM. Verifikasi manual oleh admin, dan
-        // pembeli baru dikabari lewat perintah admin `proses`/`done`.
+        // Bukti transfer: bot sengaja DIAM ke pembeli. Verifikasi manual oleh
+        // admin — jadi yang dikabari justru ADMIN (chat pribadi), dan pembeli
+        // baru mendengar kabar lewat perintah admin `proses`/`done`.
         if (hasil.bukti) {
             log.info(
-                `Bukti transfer dari ${maskNumber(nomor)} — bot tidak membalas `
-                + '(admin cek pembayaran, lalu balas `proses`/`done` di chat itu).',
+                `Bukti transfer dari ${maskNumber(nomor)} — bot tidak membalas, `
+                + 'notifikasi dikirim ke admin.',
             );
+
+            await beritahuBukti({
+                nomor,
+                nama,
+                grup,
+                transaksi: transaksiTerakhir.get(chatId) || null,
+            });
         }
 
         // Kirim ke CHAT ASAL (adapter yang menyelesaikan tujuan per chat) dan

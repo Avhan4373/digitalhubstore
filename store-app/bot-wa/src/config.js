@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { normalisasiNomor } from './core/format.js';
+
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** Baca .env sederhana (tanpa dependency tambahan). */
@@ -39,6 +41,19 @@ function loadEnv() {
 
 loadEnv();
 
+/**
+ * Daftar nomor dari env: "0823…, +62 823…" -> ["62823…"].
+ *
+ * Ditulis `08…` atau `62…` sama saja — dinormalkan supaya perbandingan
+ * `includes()` di engine selalu cocok tanpa bergantung cara penulisan di `.env`.
+ */
+function daftarNomor(nilai) {
+    return String(nilai || '')
+        .split(',')
+        .map((n) => normalisasiNomor(n))
+        .filter(Boolean);
+}
+
 /** Path absolut berkas QRIS lokal (BOT_QRIS_FILE, default `qris.jpeg` di root bot). */
 function berkasQrisLokal() {
     const jalur = path.resolve(ROOT, process.env.BOT_QRIS_FILE || 'qris.jpeg');
@@ -66,11 +81,12 @@ export const config = {
     /** Token yang sama dengan BOT_API_TOKEN di .env Laravel. */
     apiToken: required('BOT_API_TOKEN'),
 
-    /** Nomor admin (62xxx) untuk notifikasi pesanan baru. */
-    adminNumbers: (process.env.BOT_ADMIN_NUMBERS || '')
-        .split(',')
-        .map((n) => n.trim())
-        .filter(Boolean),
+    /**
+     * Nomor admin — satu-satunya nomor yang boleh memakai perintah
+     * `proses`/`done`, sekaligus penerima notifikasi pesanan baru & bukti
+     * transfer. Boleh ditulis `08…` atau `62…` (dinormalkan ke `62…`).
+     */
+    adminNumbers: daftarNomor(process.env.BOT_ADMIN_NUMBERS),
 
     /** Folder sesi WhatsApp (LocalAuth). */
     sessionPath: process.env.BOT_SESSION_PATH || path.join(ROOT, '.wwebjs_auth'),
@@ -88,10 +104,7 @@ export const config = {
     rateLimitPerMinute: Number(process.env.BOT_RATE_LIMIT || 20),
 
     /** Balas hanya ke nomor ini kalau diisi (untuk uji coba produksi). */
-    allowlist: (process.env.BOT_ALLOWLIST || '')
-        .split(',')
-        .map((n) => n.trim())
-        .filter(Boolean),
+    allowlist: daftarNomor(process.env.BOT_ALLOWLIST),
 
     /**
      * ID grup (@g.us) yang boleh dilayani. Kosong = SEMUA grup diabaikan
@@ -137,6 +150,9 @@ export function assertConfig() {
     }
 
     if (config.adminNumbers.some((n) => !/^62\d{8,14}$/.test(n))) {
-        throw new Error('BOT_ADMIN_NUMBERS harus format 62xxx, pisahkan dengan koma.');
+        throw new Error(
+            'BOT_ADMIN_NUMBERS harus nomor Indonesia yang masuk akal '
+            + '(mis. 082395124106 atau 6282395124106), pisahkan dengan koma.',
+        );
     }
 }

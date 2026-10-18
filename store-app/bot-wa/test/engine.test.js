@@ -10,6 +10,8 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 
+import * as R from '../src/core/replies.js';
+
 process.env.BOT_API_TOKEN = 'token-uji';
 process.env.BOT_API_URL = 'http://toko.test';
 
@@ -430,6 +432,31 @@ test('kirim bukti transfer (teks): bot DIAM, tidak ada balasan', async () => {
         assert.deepEqual(hasil.replies, [], `"${teks}" tidak boleh dibalas`);
         assert.equal(hasil.bukti, true, teks);
     }
+});
+
+// Notifikasi bukti masuk (ke ADMIN, bukan ke pembeli) — dikirim index.js.
+test('notifikasi bukti ke admin: nama, nomor, grup, dan pesanan terakhir', () => {
+    const teks = R.buktiMasuk({
+        nama: 'Mustaqim / Afik',
+        nomor: '6282395124106',
+        grup: 'DIGITALHUB OFFICIAL',
+        transaksi: { invoice: 'INV261018ABCDE', catatan: 'GPT PLUS SHARE 1 BULAN' },
+    });
+
+    assert.match(teks, /📸 \*Bukti transfer masuk\*/);
+    assert.match(teks, /👤 Mustaqim \/ Afik/);
+    assert.match(teks, /📱 6282395124106/);
+    assert.match(teks, /💬 Grup: DIGITALHUB OFFICIAL/);
+    assert.match(teks, /🧾 INV261018ABCDE — GPT PLUS SHARE 1 BULAN/);
+    assert.match(teks, /balas \*proses\* \/ \*done\* di chat itu/);
+});
+
+test('notifikasi bukti ke admin: chat pribadi tanpa pesanan dikenali', () => {
+    const teks = R.buktiMasuk({ nomor: '6282395124106' });
+
+    assert.match(teks, /👤 Pembeli/);
+    assert.match(teks, /💬 Chat pribadi/);
+    assert.doesNotMatch(teks, /🧾/);
 });
 
 // ------------------------------------------------------------------ pesanan

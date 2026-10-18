@@ -318,6 +318,31 @@ export function pesananDibuat(pesanan, pembayaran, store) {
 }
 
 /**
+ * Notifikasi ke ADMIN (chat pribadi) bahwa ada bukti transfer masuk.
+ *
+ * Bukan balasan ke pembeli — bot sengaja diam di chat pembeli. Pesan ini hanya
+ * untuk nomor admin, supaya bisa mengecek pembayaran di panel lalu mengabari
+ * pembeli lewat `proses`/`done`. Nomor pengirim ditulis apa adanya karena admin
+ * memerlukannya untuk mencari pesanan.
+ *
+ * @param {{nama?: string, nomor?: string, grup?: string, transaksi?: {invoice?: string, catatan?: string}|null}} data
+ */
+export function buktiMasuk({ nama = '', nomor = '', grup = '', transaksi = null }) {
+    return [
+        '📸 *Bukti transfer masuk*',
+        '',
+        `👤 ${nama || 'Pembeli'}`,
+        `📱 ${nomor || '(nomor tidak terbaca)'}`,
+        grup ? `💬 Grup: ${grup}` : '💬 Chat pribadi',
+        ...(transaksi?.invoice
+            ? [`🧾 ${transaksi.invoice} — ${transaksi.catatan || 'tanpa catatan'}`]
+            : []),
+        '',
+        'Cek pembayaran di panel, lalu balas *proses* / *done* di chat itu.',
+    ].join('\n');
+}
+
+/**
  * Isi akun setelah pesanan selesai (dikirim otomatis oleh poller).
  */
 export function pesananSelesai(pesanan, isi) {

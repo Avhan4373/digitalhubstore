@@ -39,9 +39,23 @@ tampilan WhatsApp. Balasan pertama bot dikirim sebagai **reply/quote** ke pesan
 pembeli (terutama terlihat di grup), sisanya pesan biasa.
 
 **Bukti transfer tidak dibalas bot.** Gambar (atau teks "sudah transfer", "bukti",
-"tf") hanya dicatat di log — tidak ada balasan apa pun, termasuk kalau pesanannya
-tidak ditemukan. Verifikasi pembayaran memang manual: admin mengecek di panel,
-lalu mengabari pembeli lewat perintah `proses`/`done` (lihat bawah).
+"tf") hanya dicatat di log — tidak ada balasan apa pun ke pembeli, termasuk kalau
+pesanannya tidak ditemukan. Sebagai gantinya, bot mengirim **notifikasi ke chat
+pribadi tiap nomor di `BOT_ADMIN_NUMBERS`**:
+
+```
+📸 *Bukti transfer masuk*
+
+👤 Mustaqim / Afik
+📱 6282395124106
+💬 Grup: DIGITALHUB OFFICIAL
+🧾 INV261018ABCDE — GPT PLUS SHARE 1 BULAN
+
+Cek pembayaran di panel, lalu balas *proses* / *done* di chat itu.
+```
+
+Verifikasi pembayaran memang manual: admin mengecek di panel, lalu mengabari
+pembeli lewat perintah `proses`/`done` (lihat bawah).
 
 Hanya varian yang benar-benar butuh data (mis. "Email Canva") yang masih
 ditanyakan sebelum pesanan dibuat.
@@ -154,7 +168,7 @@ Tanpa token yang cocok, seluruh endpoint `/api/bot/*` menolak semua permintaan.
 |---|---|
 | `BOT_API_URL` | URL Laravel, mis. `https://store.avhanapp.my.id` |
 | `BOT_API_TOKEN` | **wajib**, sama dengan token di Laravel |
-| `BOT_ADMIN_NUMBERS` | nomor admin (62xxx), dipisah koma: penerima notifikasi pesanan baru **dan** satu-satunya nomor yang boleh mengetik `proses`/`done` |
+| `BOT_ADMIN_NUMBERS` | nomor admin (boleh `08…` atau `62…`), dipisah koma: penerima notifikasi pesanan baru **dan** bukti transfer, sekaligus satu-satunya nomor yang boleh mengetik `proses`/`done` |
 | `BOT_CHROME_PATH` | path Chrome; kosong = cari otomatis |
 | `BOT_ALLOWLIST` | kalau diisi, hanya nomor ini yang dilayani (uji produksi) |
 | `BOT_GROUP_ALLOWLIST` | ID grup (`@g.us`) yang boleh dilayani; kosong = semua grup diabaikan |

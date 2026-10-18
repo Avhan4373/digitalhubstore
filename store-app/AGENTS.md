@@ -186,11 +186,14 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   "bukti"/"transfer"/"tf"/"sudah transfer" dikenali sebagai bukti dan bot
   mengembalikan `{ replies: [], bukti: true }` — diam total, termasuk kalau
   pesanannya tidak ditemukan (dulu bot menjawab "saya tidak menemukan pesanan
-  yang menunggu pembayaran…", itu hanya menambah bising). Verifikasi manual oleh
-  admin, lalu pembeli dikabari lewat `proses`/`done`. Periksa urutan di
-  `route()`: bukti harus diperiksa SEBELUM pencarian, kalau tidak "sudah
-  transfer" dianggap nama produk. Jangan kembalikan balasan ke pembeli di jalur
-  ini.
+  yang menunggu pembayaran…", itu hanya menambah bising). Yang dikabari justru
+  ADMIN: `beritahuBukti()` di `src/index.js` mengirim DM ke setiap
+  `BOT_ADMIN_NUMBERS` (nama, nomor pengirim apa adanya, grup/DM, pesanan terakhir
+  bila ada, ajakan balas `proses`/`done`); teksnya `R.buktiMasuk()` supaya bisa
+  diuji tanpa Chrome. Verifikasi manual oleh admin, lalu pembeli dikabari lewat
+  `proses`/`done`. Periksa urutan di `route()`: bukti harus diperiksa SEBELUM
+  pencarian, kalau tidak "sudah transfer" dianggap nama produk. Jangan
+  kembalikan balasan ke pembeli di jalur ini.
 - **Chrome harus 146.** Chrome lebih baru (termasuk Flatpak) membuat inject
   gagal (`Execution context was destroyed`). Pasang via `@puppeteer/browsers`.
 
