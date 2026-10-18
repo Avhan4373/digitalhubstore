@@ -669,6 +669,33 @@ export function buatAdapterWhatsApp(handler) {
         handler.onDisconnected?.(alasan);
     });
 
+    /**
+     * Nama grup WhatsApp.
+     *
+     * `client.getChatById()` membangun model penuh dan bisa gagal karena bug
+     * library (lihat `src/patch-lib.js`). Kalau itu terjadi, nama grup masih
+     * bisa dibaca langsung dari koleksi chat WhatsApp Web — satu-satunya data
+     * yang dibutuhkan di sini. Hasil akhirnya selalu string ('' kalau gagal).
+     */
+    async function namaGrup(chatId) {
+        try {
+            const chat = await client.getChatById(chatId);
+
+            if (chat?.name) return String(chat.name).slice(0, 80);
+        } catch (e) {
+            log.debug(`getChatById gagal untuk nama grup: ${e.message}`);
+        }
+
+        // Jalur cadangan: `formattedTitle` tidak butuh pembungkusan model.
+        const langsung = await client.pupPage.evaluate(async (id) => {
+            const chat = await window.WWebJS.getChat(id, { getAsModel: false });
+
+            return String(chat?.formattedTitle || chat?.groupMetadata?.subject || '');
+        }, chatId);
+
+        return String(langsung || '').slice(0, 80);
+    }
+
     client.on('message', async (msg) => {
         const alasan = alasanDiabaikan(msg, config.allowSelf, config.groupAllowlist);
 
@@ -691,14 +718,14 @@ export function buatAdapterWhatsApp(handler) {
         const dariGrup = String(chatId).includes('@g.us');
 
         // Nama grup (dipakai balasan ADMIN "TRANSAKSI ...": baris 📂 Grup).
+        // Dibaca lewat `namaGrup()` yang tahan terhadap `getChatById()` gagal,
+        // supaya baris grup tidak pernah kosong hanya karena satu bug library.
         let grup = '';
         if (dariGrup) {
-            grup = await msg.getChat()
-                .then((chat) => String(chat?.name || '').slice(0, 80))
-                .catch((e) => {
-                    log.debug(`Nama grup tidak terbaca: ${e.message}`);
-                    return '';
-                });
+            grup = await namaGrup(chatId).catch((e) => {
+                log.debug(`Nama grup tidak terbaca: ${e.message}`);
+                return '';
+            });
         }
         // ID pesan pembeli: dipakai agar balasan pertama menjadi reply/quote
         // ke pesan ini, bukan pesan terpisah.
@@ -744,23 +771,48 @@ export function buatAdapterWhatsApp(handler) {
         /**
          * Tutup/buka grup memakai setelan WhatsApp "announcement".
          *
-         * `tutup` = hanya admin yang boleh mengirim pesan; `buka` = semua
-         * anggota boleh. Mengembalikan `true` kalau berhasil.
+         * `buka: false` = hanya admin yang boleh mengirim pesan; `buka: true` =
+         * semua anggota boleh. Mengembalikan `{ berhasil, alasan }` — `alasan`
+         * berisi penjelasan yang bisa dibaca manusia saat gagal.
          *
-         * WhatsApp menolak perubahan ini kalau bot bukan admin grup — hasil
-         * `false` dipakai pemanggil untuk memberi tahu admin, bukan dianggap
-         * error.
+         * Sengaja TIDAK memakai `GroupChat.setMessagesAdminsOnly()`: method itu
+         * melewati `client.getChatById()` yang bisa melempar error minified `r`
+         * (bug `lastReceivedKey` — lihat `src/patch-lib.js`). Di sini chat diambil
+         * tanpa membangun model, dan error-nya ditangkap DI DALAM halaman supaya
+         * tidak menyeberang batas puppeteer sebagai `r`.
          */
         async aturGrup(chatId, { buka = false } = {}) {
-            const chat = await client.getChatById(chatId);
+            return client.pupPage.evaluate(async (id, hanyaAdmin) => {
+                try {
+                    const chat = await window.WWebJS.getChat(id, { getAsModel: false });
 
-            // whatsapp-web.js hanya punya GroupChat untuk chat grup; kalau
-            // ternyata bukan grup, jangan lanjut.
-            if (typeof chat?.setMessagesAdminsOnly !== 'function') {
-                throw new Error('Chat ini bukan grup WhatsApp.');
-            }
+                    if (!chat?.groupMetadata) {
+                        return { berhasil: false, alasan: 'Chat ini bukan grup WhatsApp.' };
+                    }
 
-            return chat.setMessagesAdminsOnly(!buka);
+                    await window
+                        .require('WAWebSetPropertyGroupAction')
+                        .setGroupProperty(chat, 'announcement', hanyaAdmin ? 1 : 0);
+
+                    // WhatsApp menyimpan setelan ini di server; baca ulang state
+                    // lokal untuk memastikan perubahannya benar-benar diterima.
+                    const sekarang = Boolean(chat.groupMetadata.announce);
+
+                    return sekarang === hanyaAdmin
+                        ? { berhasil: true, alasan: '' }
+                        : { berhasil: false, alasan: 'Setelan grup tidak berubah di server.' };
+                } catch (e) {
+                    // Pesan asli WhatsApp (mis. 403 bukan admin) dibaca di sini;
+                    // kalau dilempar, isinya hilang menjadi `r`.
+                    const kode = e?.statusCode ?? e?.code ?? '';
+                    const pesan = String(e?.message || e?.name || 'tidak diketahui');
+
+                    return {
+                        berhasil: false,
+                        alasan: kode ? `${pesan} (kode ${kode})` : pesan,
+                    };
+                }
+            }, chatId, !buka);
         },
 
         async berhenti() {

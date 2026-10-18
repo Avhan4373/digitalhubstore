@@ -25,14 +25,27 @@ import { patchWhatsappWeb } from './patch-lib.js';
 
 assertConfig();
 
-// Kiriman media (QRIS!) rusak di whatsapp-web.js v1.34.7 tanpa patch ini.
+// Dua bug library ini merusak fitur penting tanpa jejak yang jelas:
+//  - kiriman media (QRIS!) gagal karena `__x_id` menimpa ID pesan;
+//  - `getChatById()` selalu melempar `r` karena `getChatModel()` membaca
+//    `lastReceivedKey._serialized` yang tidak ada — nama grup dan
+//    `setMessagesAdminsOnly()` (tutup/buka grup) ikut mati.
 // Dipanggil sebelum client dibuat; idempoten dan aman diulang tiap start.
 const statusPatch = patchWhatsappWeb();
 
-if (statusPatch === 'dipasang') {
+if (statusPatch.media === 'dipasang') {
     log.info('Patch pengiriman media whatsapp-web.js dipasang (bug #201921).');
-} else if (statusPatch !== 'sudah-ada') {
-    log.warn(`Patch media whatsapp-web.js TIDAK terpasang (${statusPatch}) — kiriman gambar bisa gagal.`);
+} else if (statusPatch.media !== 'sudah-ada') {
+    log.warn(`Patch media whatsapp-web.js TIDAK terpasang (${statusPatch.media}) — kiriman gambar bisa gagal.`);
+}
+
+if (statusPatch.model === 'dipasang') {
+    log.info('Patch getChatModel whatsapp-web.js dipasang (lastReceivedKey tanpa _serialized).');
+} else if (statusPatch.model !== 'sudah-ada') {
+    log.warn(
+        `Patch getChatModel whatsapp-web.js TIDAK terpasang (${statusPatch.model}) — `
+        + 'nama grup dan perintah tutup/buka grup akan gagal.',
+    );
 }
 
 let adapter = null;
@@ -233,7 +246,7 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
             let alasan = '';
 
             try {
-                berhasil = await adapter.aturGrup(chatId, { buka });
+                ({ berhasil, alasan } = await adapter.aturGrup(chatId, { buka }));
             } catch (e) {
                 alasan = e.message;
             }
@@ -244,7 +257,7 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
                     + `${alasan ? `: ${alasan}` : ' — bot mungkin bukan admin grup.'}`,
                 );
 
-                await adapter.kirim(chatId, R.grupBotBukanAdmin(), { balasId: pesanId });
+                await adapter.kirim(chatId, R.grupBotBukanAdmin(alasan), { balasId: pesanId });
                 return;
             }
 

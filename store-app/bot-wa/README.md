@@ -155,7 +155,10 @@ Admin mengetik di **dalam grup** yang ingin diatur:
 | `buka grup` (juga `open group`) | semua anggota bisa kirim pesan lagi |
 
 - **Bot harus jadi admin grup.** WhatsApp menolak perubahan setelan dari
-  non-admin; kalau begitu, bot membalas bahwa ia belum admin (bukan gagal diam).
+  non-admin; kalau begitu, bot membalas penjelasan **beserta pesan asli dari
+  WhatsApp**, bukan sekadar "belum admin" (dulu semua kegagalan dilaporkan
+  sebagai "belum admin", termasuk bug library yang tidak ada hubungannya
+  dengan izin).
 - **Hanya di dalam grup.** Di chat pribadi bot tidak tahu grup mana yang
   dimaksud, jadi perintahnya ditolak dengan penjelasan — tidak menebak.
 - **Hanya nomor admin** (`BOT_ADMIN_NUMBERS`). Pembeli yang mengetik kata ini
@@ -245,7 +248,7 @@ memakai nomor WhatsApp pengirim yang sebenarnya.
 Seluruh alur bisa diuji tanpa Chrome dan tanpa scan QR:
 
 ```bash
-npm test          # 99 test: parser, format, filter WA, katalog, alur percakapan
+npm test          # 104 test: parser, format, filter WA, katalog, alur percakapan
 npm run simulate  # coba percakapan langsung di terminal
 npm run cek       # periksa token + katalog ke Laravel (tanpa kirim pesan)
 ```
@@ -307,6 +310,19 @@ WantedBy=multi-user.target
   otomatis setiap bot start (idempoten, jadi `npm install` yang menimpa
   `node_modules` tidak masalah). Gejalanya tanpa patch: QRIS gagal terkirim dan
   hanya teks penggantinya yang sampai ke pembeli.
+- **`getChatById()` juga butuh patch.** `getChatModel()` membaca
+  `chat.lastReceivedKey._serialized`, padahal di WhatsApp Web sekarang objek itu
+  kadang hanya punya `$1`. Akibatnya `Msg.get(undefined)` melempar
+  `DataError: ... No key or key range specified`, error itu menyeberang
+  puppeteer menjadi **`r`** (tanpa pesan), dan SELURUH `getChatById()` gagal.
+  Efeknya: nama grup tidak pernah terbaca (baris `📂 Grup` kosong atau berisi ID
+  grup) dan `setMessagesAdminsOnly()` (tutup/buka grup) gagal dengan `r`
+  walaupun bot **sudah** admin grup. Patch kedua di `src/patch-lib.js` memakai
+  `_serialized || $1` dan membungkus pengambilan pesan terakhir dengan
+  `try/catch`. `aturGrup()` di adapter sengaja tidak memakai
+  `GroupChat.setMessagesAdminsOnly()`: ia mengambil chat lewat
+  `getChat(..., { getAsModel: false })` dan menangkap error **di dalam halaman**,
+  supaya pesan asli WhatsApp (mis. kode 403) terbaca, bukan menjadi `r`.
 - **Uji kirim media tanpa pembeli:** hentikan bot, lalu
   `node uji-media.mjs 628xxxxxxxxxx@c.us "caption uji"`. Skrip ini login dengan
   sesi yang sama, mengirim `qris.jpeg` ke chat tujuan, lalu keluar — berguna

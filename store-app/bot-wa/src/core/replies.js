@@ -563,19 +563,18 @@ export function grupDibuka(namaGrup = '') {
 }
 
 /**
- * Perintah tutup/buka grup ditolak karena bot bukan admin grup.
+ * Perintah tutup/buka grup gagal.
  *
- * WhatsApp hanya mengizinkan admin mengubah pengaturan grup; kalau bot belum
- * dijadikan admin, perubahannya gagal dan admin perlu tahu alasannya — bukan
- * sekadar "gagal".
+ * `alasan` berisi pesan asli dari WhatsApp (mis. 403 bukan admin). Ditampilkan
+ * supaya admin tidak menebak-nebak: sebelumnya semua kegagalan dilaporkan
+ * sebagai "bot belum admin", padahal bisa jadi penyebabnya lain.
  */
-export function grupBotBukanAdmin() {
+export function grupBotBukanAdmin(alasan = '') {
     return [
         '⚠️ *Tidak bisa mengubah pengaturan grup.*',
         '',
-        'Bot belum menjadi admin di grup ini.',
-        '',
-        'Jadikan nomor bot sebagai admin grup, lalu ulangi perintahnya.',
+        'Pastikan nomor bot sudah dijadikan *admin grup*, lalu ulangi perintahnya.',
+        ...(alasan ? ['', `Detail: ${alasan}`] : []),
     ].join('\n');
 }
 
