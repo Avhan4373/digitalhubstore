@@ -522,68 +522,6 @@ export function fallback() {
 }
 
 /**
- * `*pay*` saat pembeli sedang melihat daftar paket sebuah produk.
- *
- * Pembeli ini sudah selangkah lagi: tinggal memilih paket. Menyuruhnya
- * "ketik list" akan memutar balik percakapannya sendiri, jadi tampilkan ulang
- * daftar paketnya dengan harga supaya ia bisa langsung membalas namanya.
- */
-export function pilihPaketDulu(produk, varian) {
-    const namaProduk = String(produk?.name || 'produk ini').toUpperCase();
-    const daftar = Array.isArray(varian) ? varian : [];
-
-    const baris = [
-        `🔹 Pesanan belum dibuat — pilih paket *${escapeWa(namaProduk)}* dulu.`,
-        '',
-    ];
-
-    for (const v of daftar) {
-        const nama = escapeWa(v.bot_label || v.name);
-        baris.push(`${nama} : *${angka(v.price)}*${v.purchasable ? '' : ' ❌'}`);
-    }
-
-    baris.push(
-        '',
-        'Balas nama paketnya (contoh: *1 bulan*), lalu QRIS dikirim otomatis.',
-    );
-
-    return baris.join('\n');
-}
-
-/** `*pay*` saat pembeli masih di daftar hasil pencarian. */
-export function pilihProdukDulu() {
-    return [
-        '🔹 Pesanan belum dibuat — pilih produknya dulu.',
-        '',
-        'Balas nama layanan yang ingin dibeli, atau nomornya.',
-    ].join('\n');
-}
-
-/** `*pay*` saat pesanan sedang menunggu isian (nomor/data wajib). */
-export function selesaikanPesananDulu() {
-    return [
-        '🔹 Pesanan belum selesai dibuat.',
-        '',
-        'Lengkapi dulu data yang diminta bot, lalu QRIS dikirim otomatis.',
-        'Ketik *batal* untuk mengulang dari awal.',
-    ].join('\n');
-}
-
-/**
- * `*pay*` dari nomor yang belum pernah membuat pesanan sama sekali.
- * Bot tidak mengirim QRIS sebelum ada pesanan nyata, supaya `pay` tidak jadi
- * pintas ke info bayar tanpa konteks order.
- */
-export function mintaPilihProdukDulu() {
-    return [
-        '🔹 Belum ada pesanan di nomor ini.',
-        '',
-        'Ketik *list* untuk melihat katalog, lalu pilih nama layanannya.',
-        'Setelah membuka detail & memilih paket, QRIS akan dikirim otomatis.',
-    ].join('\n');
-}
-
-/**
  * Bukti transfer yang dikirim oleh nomor yang **belum pernah membuat pesanan**
  * — ditolak supaya admin tidak dapat notifikasi palsu.
  */

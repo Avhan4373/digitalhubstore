@@ -428,40 +428,13 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Info pembayaran resmi: nomor owner sah + QRIS resmi.
     // Dikirim sebagai SATU pesan: gambar QRIS dengan teksnya sebagai caption,
     // supaya kalimat "QRIS diatas" menunjuk ke gambar di pesan itu sendiri.
+    //
+    // Tidak ada syarat apa pun: `pay` selalu langsung menampilkan QR. Pembeli
+    // memakainya untuk melihat QRIS resmi kapan saja (termasuk sebelum memilih
+    // paket, atau untuk membayar ulang), dan admin memakainya saat verifikasi
+    // manual. Validasi "sudah order atau belum" hanya berlaku untuk bukti
+    // transfer (lihat `buktiAtauTolak`), bukan untuk `pay`.
     if (aksi.type === 'pay') {
-        // Validasi: `pay` hanya mengirim QRIS resmi kalau nomor ini benar-benar
-        // sudah punya pesanan. State percakapan tidak bisa dipakai sebagai bukti
-        // (lihat `punyaPesananAktif()`), jadi tanyakan ke server.
-        //
-        // `null` = nomor belum bisa dipetakan ke nomor HP / API gagal. Dalam
-        // kasus itu bot tidak memblokir: info pembayaran resmi memang publik
-        // dan aman dibagikan.
-        //
-        // Admin dikecualikan: mereka memang tidak pernah membuat pesanan,
-        // tapi butuh QRIS/nomor resmi untuk verifikasi manual.
-        const sudahOrder = ctx.admin ? true : await punyaPesananAktif(nomor);
-
-        if (sudahOrder === false) {
-            // Belum ada pesanan. Pesannya HARUS sesuai posisi percakapan:
-            // pembeli yang baru melihat daftar paket Netflix tidak boleh
-            // disuruh "ketik list" — itu memutar balik percakapannya sendiri.
-            // Yang kurang dari mereka cuma satu langkah: memilih paket.
-            switch (state?.tahap) {
-                case STATE.DETAIL:
-                    return { replies: [R.pilihPaketDulu(state.produk, state.varian)] };
-
-                case STATE.PILIH_CARI:
-                    return { replies: [R.pilihProdukDulu()] };
-
-                case STATE.DATA:
-                case STATE.NOMOR:
-                    return { replies: [R.selesaikanPesananDulu()] };
-
-                default:
-                    return { replies: [R.mintaPilihProdukDulu()] };
-            }
-        }
-
         clearState(chatId);
         const data = await ambilKatalog();
         const gambar = config.qrisLokal || data.store.qris_url || null;

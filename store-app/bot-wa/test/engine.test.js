@@ -368,8 +368,9 @@ test('pembeli (bukan admin) mengetik proses tidak dapat pengumuman transaksi', a
 
 // ------------------------------------------------------------- info pembayaran
 
-test('pay setelah punya pesanan: kirim QRIS resmi (gambar + caption satu pesan)', async () => {
-    // Pembeli nyata (bukan admin) yang sudah punya pesanan di server.
+test('pay selalu langsung menampilkan QRIS resmi (tanpa syarat pesanan)', async () => {
+    // Nomor pembeli biasa yang BELUM punya pesanan: `pay` tetap harus
+    // mengirim QR — tidak ada validasi/embel-embel apa pun.
     engine.resetRateLimit('628111000113');
 
     const hasil = await engine.handlePesan({
@@ -393,86 +394,16 @@ test('pay setelah punya pesanan: kirim QRIS resmi (gambar + caption satu pesan)'
     assert.equal(hasil.qrisDulu, true);
 });
 
-test('pay tanpa gambar QRIS tetap mengirim teks + peringatan', async () => {
-    const R = await import('../src/core/replies.js');
-    const teks = R.pembayaranResmi(
-        { name: 'Toko', whatsapp: '6282395124106', owner_numbers: [], qris_url: null },
-        false,
+// Regression: `pay` tidak boleh memanggil riwayat pesanan sama sekali —
+// ia murni menampilkan info pembayaran resmi.
+test('pay tidak memanggil API riwayat pesanan', async () => {
+    panggilan = [];
+    await kirim('pay');
+
+    assert.ok(
+        !panggilan.some((p) => p.path === '/api/bot/pesanan/riwayat'),
+        'pay tidak perlu memeriksa pesanan',
     );
-
-    assert.match(teks, /^PAYMENT RESMI$/m);
-    assert.match(teks, /Gambar QRIS belum diatur admin/);
-});
-
-
-test("pay dari nomor tanpa pesanan -> arahkan pilih dulu", async () => {
-    stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
-    engine.resetRateLimit("628111000111");
-
-    // Nomor pembeli biasa (bukan admin) supaya validasi benar-benar diuji.
-    const hasil = await engine.handlePesan({
-        teks: "pay",
-        nomor: "628111000111",
-        chatId: "dm-pay",
-        nama: "Pembeli",
-    });
-
-    assert.equal(hasil.qris, undefined);
-    assert.equal(hasil.qrisDulu, undefined);
-    assert.match(hasil.replies[0], /Belum ada pesanan di nomor ini/);
-});
-
-// `pay` TIDAK boleh memakai state percakapan sebagai bukti "sudah order":
-// membuka detail produk juga membuat state, padahal pesanan belum ada.
-test("pay saat baru buka detail produk tetap ditolak", async () => {
-    stubFetch((path) => {
-        if (path === '/api/bot/katalog') return KATALOG;
-        if (path === '/api/bot/produk/wetv') return { ...DETAIL, product: { ...DETAIL.product, slug: 'wetv', name: 'WeTV' } };
-        if (path === '/api/bot/pesanan/riwayat') return { orders: [] };
-        return null;
-    });
-    engine.resetRateLimit("628111000112");
-
-    await engine.handlePesan({ teks: 'wetv', nomor: '628111000112', chatId: 'dm-pay2', nama: 'Pembeli' });
-    const hasil = await engine.handlePesan({ teks: 'pay', nomor: '628111000112', chatId: 'dm-pay2', nama: 'Pembeli' });
-
-    assert.equal(hasil.qris, undefined, 'QRIS tidak boleh dikirim sebelum ada pesanan');
-    assert.match(hasil.replies[0], /Belum ada pesanan di nomor ini/);
-});
-
-// Regression: pembeli yang SUDAH membuka daftar paket (mis. "netflix") lalu
-// mengetik `pay` tidak boleh disuruh "ketik list" — itu memutar balik
-// percakapannya sendiri. Yang kurang hanya memilih paket.
-test("pay saat sudah melihat daftar paket: tampilkan ulang paketnya", async () => {
-    stubFetch((path) => {
-        if (path === '/api/bot/katalog') return KATALOG;
-        if (path === '/api/bot/produk/netflix') return { ...DETAIL, product: { ...DETAIL.product, slug: 'netflix', name: 'Netflix' } };
-        if (path === '/api/bot/pesanan/riwayat') return { orders: [] };
-        return null;
-    });
-    engine.resetRateLimit('628111000114');
-
-    await engine.handlePesan({ teks: 'netflix', nomor: '628111000114', chatId: 'dm-netflix', nama: 'Pembeli' });
-    const hasil = await engine.handlePesan({ teks: 'pay', nomor: '628111000114', chatId: 'dm-netflix', nama: 'Pembeli' });
-
-    const teks = hasil.replies[0];
-
-    assert.equal(hasil.qris, undefined, 'QRIS tidak boleh dikirim sebelum ada pesanan');
-    assert.match(teks, /Pesanan belum dibuat/);
-    assert.match(teks, /NETFLIX/);
-    assert.match(teks, /Balas nama paketnya/);
-    // Tidak boleh menyuruh memulai dari awal.
-    assert.doesNotMatch(teks, /Ketik \*list\*/);
-});
-
-// Admin tidak pernah membuat pesanan tapi tetap butuh QRIS/nomor resmi.
-test("pay dari admin tetap mengirim QRIS resmi", async () => {
-    stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
-
-    const hasil = await kirim("pay");
-
-    assert.ok(hasil.qris, "admin tetap dapat QRIS");
-    assert.equal(hasil.qrisDulu, true);
 });
 
 test('pencarian banyak hasil menampilkan pilihan', async () => {

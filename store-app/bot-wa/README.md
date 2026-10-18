@@ -81,7 +81,7 @@ ditanyakan sebelum pesanan dibuat.
 |---|---|
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog gaya papan menu + tanggal/jam WIB |
 | nama produk (`canva`, `netflix`) | cari produk |
-| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS). **Hanya untuk nomor yang sudah punya pesanan** (dan admin) — nomor lain diarahkan `list` dulu |
+| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS). **Selalu langsung dikirim**, tanpa syarat sudah memilih produk |
 | gambar / "sudah transfer" / "bukti" | **tidak dibalas** bila nomor punya pesanan — admin mengecek manual lalu mengabari lewat `proses`/`done`. Nomor yang belum pernah order ditolak dengan arahan `list` |
 | `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
@@ -224,7 +224,7 @@ memakai nomor WhatsApp pengirim yang sebenarnya.
 Seluruh alur bisa diuji tanpa Chrome dan tanpa scan QR:
 
 ```bash
-npm test          # 97 test: parser, format, filter WA, katalog, alur percakapan
+npm test          # 94 test: parser, format, filter WA, katalog, alur percakapan
 npm run simulate  # coba percakapan langsung di terminal
 npm run cek       # periksa token + katalog ke Laravel (tanpa kirim pesan)
 ```
