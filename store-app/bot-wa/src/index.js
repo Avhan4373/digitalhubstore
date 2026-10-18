@@ -46,8 +46,8 @@ function catatPesanan(chatId, invoice) {
  * di grup terlihat jelas pertanyaan mana yang diberi jawaban.
  */
 async function kirimHasil(chatId, hasil, balasId = null) {
-    // QRIS yang harus tampil DI ATAS teks (perintah `pay`): gambar dikirim
-    // lebih dulu, lalu pesan teks menyusul.
+    // Gambar+teks jadi SATU pesan (perintah `pay`): caption gambar langsung
+    // berisi info pembayarannya, jadi tidak ada pesan teks terpisah.
     if (hasil.qris && hasil.qrisDulu) {
         await adapter.kirimMedia(chatId, hasil.qris, hasil.qrisCaption || '💳 QRIS RESMI');
     }

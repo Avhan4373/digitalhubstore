@@ -134,6 +134,41 @@ async function mediaDariUrl(url) {
     return new MessageMedia(mime, buf.toString('base64'), 'qris.jpg');
 }
 
+/** Tebak mime dari ekstensi berkas gambar lokal. */
+function mimeDariJalur(jalur) {
+    const ext = path.extname(jalur).toLowerCase();
+
+    if (ext === '.png') return 'image/png';
+    if (ext === '.webp') return 'image/webp';
+    if (ext === '.gif') return 'image/gif';
+
+    return 'image/jpeg';
+}
+
+/** Baca gambar dari berkas lokal (mis. `qris.jpeg` milik bot) jadi MessageMedia. */
+function mediaDariBerkas(jalur) {
+    // Placeholder 0 byte pernah membuat Chrome crash di bot sebelumnya.
+    if (!fs.existsSync(jalur)) throw new Error(`berkas tidak ada: ${jalur}`);
+
+    const buf = fs.readFileSync(jalur);
+
+    if (buf.length < 100) throw new Error('berkas gambar kosong/terlalu kecil');
+
+    return new MessageMedia(mimeDariJalur(jalur), buf.toString('base64'), path.basename(jalur));
+}
+
+/**
+ * Gambar (MessageMedia) dari URL http(s) ATAU berkas lokal.
+ *
+ * Berkas lokal dipakai untuk QRIS statis milik bot supaya tidak bergantung
+ * pada API Laravel; URL tetap didukung untuk QRIS dari pengaturan toko.
+ */
+async function mediaDari(jalurAtauUrl) {
+    return /^https?:\/\//i.test(jalurAtauUrl)
+        ? mediaDariUrl(jalurAtauUrl)
+        : mediaDariBerkas(jalurAtauUrl);
+}
+
 /**
  * Apakah sesi WhatsApp (LocalAuth) sudah pernah disimpan?
  *
@@ -365,9 +400,9 @@ export function buatAdapterWhatsApp(handler) {
     }
 
     /** Kirim gambar; kalau gagal, kirim teks pengganti supaya pembeli tetap tahu. */
-    async function kirimGambar(chatId, url, caption) {
+    async function kirimGambar(chatId, sumber, caption) {
         try {
-            const media = await mediaDariUrl(url);
+            const media = await mediaDari(sumber);
             await client.sendMessage(chatId, media, { caption });
             return true;
         } catch (e) {

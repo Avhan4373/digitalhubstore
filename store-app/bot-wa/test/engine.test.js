@@ -288,18 +288,32 @@ test('pencarian satu hasil langsung membuka detail', async () => {
 
 // ------------------------------------------------------------- info pembayaran
 
-test('pay menampilkan nomor owner resmi + QRIS resmi', async () => {
+test('pay menampilkan nomor owner resmi + QRIS resmi dalam SATU pesan', async () => {
     const hasil = await kirim('pay');
-    const teks = hasil.replies[0];
+    const teks = hasil.qrisCaption || '';
 
+    // Teks info pembayaran jadi caption gambar, bukan pesan terpisah.
+    assert.deepEqual(hasil.replies, []);
     assert.match(teks, /^PAYMENT RESMI$/m);
     assert.match(teks, /\* 082243890517/);
     assert.match(teks, /\* 08214369690/);
     assert.match(teks, /Pay wajib menggunakan QRIS diatas/);
 
-    // QRIS resmi ikut dikirim dan tampil SEBELUM teks ("QRIS diatas").
-    assert.equal(hasil.qris, 'https://toko.test/qris-resmi.jpg');
+    // Gambar QRIS ikut dikirim (berkas lokal `qris.jpeg` atau QRIS pengaturan).
+    assert.ok(hasil.qris, 'gambar QRIS disertakan');
+    assert.match(String(hasil.qris), /qris/i);
     assert.equal(hasil.qrisDulu, true);
+});
+
+test('pay tanpa gambar QRIS tetap mengirim teks + peringatan', async () => {
+    const R = await import('../src/core/replies.js');
+    const teks = R.pembayaranResmi(
+        { name: 'Toko', whatsapp: '6282395124106', owner_numbers: [], qris_url: null },
+        false,
+    );
+
+    assert.match(teks, /^PAYMENT RESMI$/m);
+    assert.match(teks, /Gambar QRIS belum diatur admin/);
 });
 
 test('pencarian banyak hasil menampilkan pilihan', async () => {

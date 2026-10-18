@@ -310,16 +310,25 @@ async function route(aksi, state, chatId, nomor, ctx) {
         return { replies: [R.katalog(data.store, kategori)] };
     }
 
-    // Info pembayaran resmi: nomor owner sah + QRIS resmi (gambar dikirim
-    // SEBELUM teks supaya "QRIS diatas" pada pesan tunjuk ke gambar itu).
+    // Info pembayaran resmi: nomor owner sah + QRIS resmi.
+    // Dikirim sebagai SATU pesan: gambar QRIS dengan teksnya sebagai caption,
+    // supaya kalimat "QRIS diatas" menunjuk ke gambar di pesan itu sendiri.
     if (aksi.type === 'pay') {
         clearState(chatId);
         const data = await ambilKatalog();
+        const gambar = config.qrisLokal || data.store.qris_url || null;
+        const teks = R.pembayaranResmi(data.store, Boolean(gambar));
+
+        // Tanpa gambar (belum diunggah admin & berkas lokal tidak ada), teksnya
+        // tetap terkirim sebagai pesan biasa.
+        if (!gambar) {
+            return { replies: [teks] };
+        }
 
         return {
-            replies: [R.pembayaranResmi(data.store)],
-            qris: data.store.qris_url || null,
-            qrisCaption: '💳 *QRIS RESMI* — scan untuk membayar',
+            replies: [],
+            qris: gambar,
+            qrisCaption: teks,
             qrisDulu: true,
         };
     }

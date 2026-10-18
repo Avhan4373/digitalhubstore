@@ -39,6 +39,13 @@ function loadEnv() {
 
 loadEnv();
 
+/** Path absolut berkas QRIS lokal (BOT_QRIS_FILE, default `qris.jpeg` di root bot). */
+function berkasQrisLokal() {
+    const jalur = path.resolve(ROOT, process.env.BOT_QRIS_FILE || 'qris.jpeg');
+
+    return fs.existsSync(jalur) ? jalur : null;
+}
+
 function required(name) {
     const value = (process.env[name] || '').trim();
     if (value === '') {
@@ -113,6 +120,14 @@ export const config = {
      * batas tetap bisa dicari lewat nama.
      */
     batasProduk: Math.max(1, Number(process.env.BOT_MAX_PRODUCTS || 50)),
+
+    /**
+     * Berkas QRIS statis milik bot yang dikirim perintah `pay` (path absolut),
+     * atau `null` kalau berkasnya tidak ada — pemanggil lalu jatuh ke gambar
+     * QRIS dari pengaturan toko (`store.qris_url`). Berkas lokal diprioritaskan
+     * karena tidak bergantung pada API/penyimpanan Laravel.
+     */
+    qrisLokal: berkasQrisLokal(),
 };
 
 /** Validasi tambahan yang butuh beberapa nilai sekaligus. */

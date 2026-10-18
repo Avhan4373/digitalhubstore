@@ -166,7 +166,7 @@ export function katalog(store, categories, opsi = {}) {
  * wajib lewat QRIS. Nomor diambil dari pengaturan toko (`owner_numbers`,
  * satu per baris); kalau kosong, pakai nomor WhatsApp toko.
  */
-export function pembayaranResmi(store) {
+export function pembayaranResmi(store, adaQris = Boolean(store.qris_url)) {
     const daftar = (store.owner_numbers || []).filter(Boolean);
     const nomor = daftar.length > 0 ? daftar : [store.whatsapp].filter(Boolean);
 
@@ -181,7 +181,7 @@ export function pembayaranResmi(store) {
         'Pay wajib menggunakan QRIS diatas. Jika berani transaksi diluar QRIS RESMI diatas bukan tanggung jawab saya.',
     ];
 
-    if (!store.qris_url) {
+    if (!adaQris) {
         baris.push('', '⚠️ Gambar QRIS belum diatur admin — hubungi nomor di atas.');
     }
 

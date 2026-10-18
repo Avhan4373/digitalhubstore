@@ -47,7 +47,7 @@ ditanyakan sebelum pesanan dibuat.
 |---|---|
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog gaya papan menu + tanggal/jam WIB |
 | nama produk (`canva`, `netflix`) | cari produk |
-| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: nomor admin/owner sah + **gambar QRIS resmi dikirim lebih dulu**, baru teksnya ("QRIS diatas") |
+| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS) |
 | gambar / "sudah transfer" / "bukti" | konfirmasi bukti transfer |
 | `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
@@ -64,12 +64,18 @@ Balasan `pay` memakai dua data dari panel admin (**Pengaturan**):
 | Pengaturan | Dipakai untuk |
 |---|---|
 | `owner_numbers` (Nomor admin/owner resmi, satu per baris) | daftar nomor `* 08…` di balasan `pay`; kosong = pakai nomor WhatsApp toko |
-| `qris_image` + `qris_holder` | gambar QRIS resmi yang dikirim bot sebelum teksnya |
+| `qris_image` + `qris_holder` | cadangan gambar QRIS kalau berkas lokal bot tidak ada |
 
 Nomor boleh ditulis `08…` maupun `62…` — bot selalu menampilkannya dalam bentuk
-`08…`. Gambar QRIS dikirim **lebih dulu** supaya kalimat "QRIS diatas" pada teks
-menunjuk ke gambar itu. Kalau QRIS belum diunggah admin, balasan `pay` menambah
-peringatan bahwa gambarnya belum diatur.
+`08…`.
+
+Gambarnya diambil dari **berkas lokal bot** `qris.jpeg` (bisa diubah lewat
+`BOT_QRIS_FILE` di `.env`) dan dikirim sebagai **satu pesan**: gambar dengan
+teks "PAYMENT RESMI" sebagai caption — tidak ada pesan teks terpisah, jadi
+kalimat "QRIS diatas" menunjuk gambar di pesan itu sendiri. Kalau berkas lokal
+tidak ada, bot memakai `qris_url` dari pengaturan toko; kalau dua-duanya kosong,
+teksnya tetap dikirim sebagai pesan biasa dengan peringatan bahwa QRIS belum
+diatur.
 
 ## Notifikasi pesanan selesai
 
