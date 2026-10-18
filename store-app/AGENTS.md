@@ -141,13 +141,15 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   (parser, format, replies, engine); `src/adapters/whatsapp.js` satu-satunya
   yang menyentuh Chrome. `npm test` memakai `fetch` tiruan — jangan menambah
   ketergantungan jaringan di `src/core`.
-- **Katalog `list` gaya papan menu tanpa nomor urut.** `katalog()` merender
-  nama layanan huruf besar satu per baris; pembeli membalas NAMA layanan (itu
-  ditangani alur pencarian `cariProduk()`). Angka masih dipakai hanya di hasil
-  pencarian (`formatPilihanProduk()`) dan daftar paket (`detailProduk()`),
-  dan `pilihProdukNomor()` tetap disediakan. Baris produk yang dirender dan
-  `daftarProdukDatar()` sama-sama berasal dari `batasiKatalog()``; ada test
-  yang mencocokkan urutan nama di teks pesan dengan daftar tersebut.
+- **Katalog `list` & detail produk gaya papan menu tanpa nomor urut.** `katalog()`
+  merender nama layanan huruf besar satu per baris; `detailProduk()` merender
+  `"Nama Paket : *harga*"` + catatan `required_fields` berhuruf miring matematika.
+  Pembeli membalas NAMA (produk ditangani alur pencarian `cariProduk()`, paket
+  lewat `cariVarian()` di blok `cari` generik — jangan dipindah ke
+  `case STATE.DETAIL` karena pencarian generik jalan lebih dulu). Angka masih
+  diterima sebagai kompatibilitas (`pilihProdukNomor()`, indeks `state.varian`).
+  Baris/urutan yang dirender dan daftar sumber sama-sama berasal dari
+  `batasiKatalog()``; ada test yang mencocokkan urutan nama di teks pesan.
 - **Alur bot sederhana: pilih produk → QRIS → kirim bukti → admin verifikasi →
   bot kirim isi akun.** Bot TIDAK menanyakan nama/konfirmasi; nama diambil dari
   nama tampilan WhatsApp (`msg._data.notifyName`), fallback "Pembeli". Hanya
