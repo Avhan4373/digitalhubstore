@@ -141,6 +141,10 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   (parser, format, replies, engine); `src/adapters/whatsapp.js` satu-satunya
   yang menyentuh Chrome. `npm test` memakai `fetch` tiruan — jangan menambah
   ketergantungan jaringan di `src/core`.
+- **Keputusan & penyebab bug lama ada di `bot-wa/CATATAN.md`.** Sebelum
+  mengubah perilaku yang terlihat "aneh" (mis. bukti transfer tanpa validasi,
+  `pay` tanpa syarat, patch `whatsapp-web.js`), baca dulu alasannya di sana —
+  beberapa hal sudah dicoba, gagal, lalu dicabut.
 - **Katalog `list` & detail produk gaya papan menu tanpa nomor urut.** `katalog()`
   merender nama layanan huruf besar satu per baris; `detailProduk()` merender
   `"Nama Paket : *harga*"` + catatan `required_fields` berhuruf miring matematika.

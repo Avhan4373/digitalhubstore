@@ -4,6 +4,10 @@ Bot WhatsApp untuk toko **Creative Solutions**. Pembeli mengetik `list` dan
 bot mengirim katalog dari database Laravel (produk, varian, harga, stok asli) —
 bukan katalog terpisah, jadi perubahan di panel admin langsung ikut.
 
+> **Mau tahu *kenapa* sesuatu dibuat begitu?** Lihat [`CATATAN.md`](CATATAN.md) —
+> catatan kronologis keputusan, penyebab bug yang pernah terjadi, dan hal yang
+> sengaja **jangan** diubah balik.
+
 ```
 WhatsApp (pembeli)
       ↓ pesan
