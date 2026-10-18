@@ -41,7 +41,8 @@ pembeli (terutama terlihat di grup), sisanya pesan biasa.
 **Bukti transfer tidak dibalas bot.** Gambar (atau teks "sudah transfer", "bukti",
 "tf") hanya dicatat di log — tidak ada balasan apa pun ke pembeli, termasuk kalau
 pesanannya tidak ditemukan. Sebagai gantinya, bot mengirim **notifikasi ke chat
-pribadi tiap nomor di `BOT_ADMIN_NUMBERS`**:
+pribadi tiap nomor di `BOT_ADMIN_NUMBERS`**. Kalau pembeli mengirim **gambar**,
+gambarnya ikut diteruskan dan keterangan di bawah jadi caption-nya (satu pesan):
 
 ```
 📸 *Bukti transfer masuk*
@@ -53,6 +54,11 @@ pribadi tiap nomor di `BOT_ADMIN_NUMBERS`**:
 
 Cek pembayaran di panel, lalu balas *proses* / *done* di chat itu.
 ```
+
+Gambar hanya diteruskan untuk tipe gambar (`image/*`, termasuk yang dikirim
+sebagai dokumen); video/audio dan gambar > ±6 MB tidak diunduh — admin tetap
+dapat keterangannya saja. Kalau unduhan gambar gagal, notifikasi teks tetap
+dikirim, jadi admin tidak pernah kehilangan informasi bukti masuk.
 
 Verifikasi pembayaran memang manual: admin mengecek di panel, lalu mengabari
 pembeli lewat perintah `proses`/`done` (lihat bawah).

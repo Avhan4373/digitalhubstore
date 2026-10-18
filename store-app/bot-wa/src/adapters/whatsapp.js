@@ -158,15 +158,61 @@ function mediaDariBerkas(jalur) {
 }
 
 /**
- * Gambar (MessageMedia) dari URL http(s) ATAU berkas lokal.
+ * Gambar (MessageMedia) dari URL http(s), berkas lokal, ATAU media yang sudah
+ * berbentuk MessageMedia/objek mentah `{mimetype, data}`.
  *
  * Berkas lokal dipakai untuk QRIS statis milik bot supaya tidak bergantung
  * pada API Laravel; URL tetap didukung untuk QRIS dari pengaturan toko.
+ * Objek media dipakai untuk meneruskan gambar bukti transfer dari pembeli ke
+ * admin (`msg.downloadMedia()` sudah berbentuk MessageMedia).
  */
 async function mediaDari(jalurAtauUrl) {
+    if (jalurAtauUrl instanceof MessageMedia) return jalurAtauUrl;
+
+    if (jalurAtauUrl && typeof jalurAtauUrl === 'object') {
+        const { mimetype, data, filename } = jalurAtauUrl;
+
+        if (mimetype && data) {
+            return new MessageMedia(mimetype, data, filename || 'bukti.jpg');
+        }
+
+        throw new Error('objek media tidak punya mimetype/data');
+    }
+
     return /^https?:\/\//i.test(jalurAtauUrl)
         ? mediaDariUrl(jalurAtauUrl)
         : mediaDariBerkas(jalurAtauUrl);
+}
+
+/**
+ * Unduh media pesan masuk supaya bisa diteruskan ke admin (bukti transfer).
+ *
+ * Hanya gambar yang diambil: video/dokumen besar tidak layak diteruskan
+ * otomatis — untuk kasus itu admin tetap dapat notifikasi teksnya saja.
+ * Mengembalikan `null` kalau bukan gambar atau unduhannya gagal.
+ */
+async function mediaBukti(msg) {
+    const mime = String(msg?._data?.mimetype || '');
+    const jenis = String(msg?.type || '');
+
+    if (jenis !== 'image' && !mime.startsWith('image/')) return null;
+
+    try {
+        const media = await msg.downloadMedia();
+
+        if (!media?.data) return null;
+
+        // Batas wajar: base64 raksasa bikin Chrome lambat/mati.
+        if (media.data.length > 8_000_000) {
+            log.warn('Bukti gambar terlalu besar (> ±6 MB) — diteruskan sebagai teks saja.');
+            return null;
+        }
+
+        return media;
+    } catch (e) {
+        log.warn(`Bukti gambar gagal diunduh (${e.message}) — diteruskan sebagai teks saja.`);
+        return null;
+    }
 }
 
 /**
@@ -573,6 +619,11 @@ export function buatAdapterWhatsApp(handler) {
         const teks = String(msg.body || '');
         const nama = String(msg._data?.notifyName || msg._data?.verifiedName || '').slice(0, 80);
         const hasMedia = Boolean(msg.hasMedia);
+
+        // Bukti transfer: gambarnya diteruskan ke admin (lihat beritahuBukti()
+        // di src/index.js). Unduhan dilakukan di sini karena hanya adapter yang
+        // menyentuh WhatsApp; `null` = bukan gambar/gagal unduh.
+        const buktiGambar = hasMedia ? await mediaBukti(msg) : null;
         const dariGrup = String(chatId).includes('@g.us');
 
         // Nama grup (dipakai balasan ADMIN "TRANSAKSI ...": baris 📂 Grup).
@@ -593,7 +644,17 @@ export function buatAdapterWhatsApp(handler) {
         // Satu pesan error tidak boleh mematikan proses bot.
         try {
             log.info(`Pesan masuk dari ${maskNumber(nomor)}${lid ? ` (lid ${maskNumber(lid)})` : ''}${dariGrup ? ' [grup]' : ''}${hasMedia ? ' [gambar]' : ''}: ${teks.slice(0, 60)}`);
-            await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup });
+            await handler.onMessage({
+                teks,
+                chatId,
+                nomor,
+                sendTo,
+                nama,
+                hasMedia,
+                pesanId,
+                grup,
+                buktiGambar,
+            });
         } catch (e) {
             log.error(`Handler pesan gagal: ${e.message}`);
         }

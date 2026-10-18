@@ -114,16 +114,31 @@ async function kirimHasil(chatId, hasil, balasId = null) {
  *
  * Bot DIAM ke pembeli (lihat `hasil.bukti`): verifikasi manual oleh admin, dan
  * pembeli baru dikabari lewat perintah admin `proses`/`done`. Notifikasi ini
- * dikirim ke chat PRIBADI tiap nomor di `BOT_ADMIN_NUMBERS`.
+ * dikirim ke chat PRIBADI tiap nomor di `BOT_ADMIN_NUMBERS` — **beserta gambar
+ * buktinya** kalau pembeli mengirim gambar (satu pesan: gambar + caption).
  */
-async function beritahuBukti({ nomor, nama, grup, transaksi }) {
+async function beritahuBukti({ nomor, nama, grup, transaksi, gambar = null }) {
     if (config.adminNumbers.length === 0) return;
 
     const pesan = R.buktiMasuk({ nama, nomor, grup, transaksi });
 
     for (const nomorAdmin of config.adminNumbers) {
+        const tujuan = `${nomorAdmin}@c.us`;
+
+        if (gambar) {
+            try {
+                await adapter.kirimMedia(tujuan, gambar, pesan);
+                continue;
+            } catch (e) {
+                log.warn(
+                    `Bukti bergambar ke admin ${maskNumber(nomorAdmin)} gagal (${e.message}) `
+                    + '— dikirim sebagai teks saja.',
+                );
+            }
+        }
+
         try {
-            await adapter.kirim(`${nomorAdmin}@c.us`, pesan);
+            await adapter.kirim(tujuan, pesan);
         } catch (e) {
             log.warn(`Notifikasi bukti ke admin ${maskNumber(nomorAdmin)} gagal: ${e.message}`);
         }
@@ -155,7 +170,7 @@ async function beritahuAdmin(order) {
     }
 }
 
-async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup = '' }) {
+async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup = '', buktiGambar = null }) {
     // Allowlist: kalau diisi, hanya nomor itu yang dilayani. Berguna saat
     // mencoba bot di produksi tanpa mengganggu pembeli sungguhan.
     if (config.allowlist.length > 0 && !config.allowlist.includes(nomor)) {
@@ -182,8 +197,8 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
         // baru mendengar kabar lewat perintah admin `proses`/`done`.
         if (hasil.bukti) {
             log.info(
-                `Bukti transfer dari ${maskNumber(nomor)} — bot tidak membalas, `
-                + 'notifikasi dikirim ke admin.',
+                `Bukti transfer dari ${maskNumber(nomor)} (${buktiGambar ? 'bergambar' : 'teks'}) `
+                + '— bot tidak membalas, notifikasi dikirim ke admin.',
             );
 
             await beritahuBukti({
@@ -191,6 +206,7 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
                 nama,
                 grup,
                 transaksi: transaksiTerakhir.get(chatId) || null,
+                gambar: buktiGambar,
             });
         }
 

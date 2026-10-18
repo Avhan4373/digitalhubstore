@@ -189,11 +189,16 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   yang menunggu pembayaran…", itu hanya menambah bising). Yang dikabari justru
   ADMIN: `beritahuBukti()` di `src/index.js` mengirim DM ke setiap
   `BOT_ADMIN_NUMBERS` (nama, nomor pengirim apa adanya, grup/DM, pesanan terakhir
-  bila ada, ajakan balas `proses`/`done`); teksnya `R.buktiMasuk()` supaya bisa
-  diuji tanpa Chrome. Verifikasi manual oleh admin, lalu pembeli dikabari lewat
-  `proses`/`done`. Periksa urutan di `route()`: bukti harus diperiksa SEBELUM
-  pencarian, kalau tidak "sudah transfer" dianggap nama produk. Jangan
-  kembalikan balasan ke pembeli di jalur ini.
+  bila ada, ajakan balas `proses`/`done`) **beserta gambarnya**: adapter
+  mengunduh media pesan masuk di `mediaBukti()` (hanya `image/*`, maks ±6 MB —
+  `msg.downloadMedia()` mengembalikan `MessageMedia`) lalu `beritahuBukti()`
+  memakainya sebagai satu pesan gambar + caption; `mediaDari()` di adapter
+  menerima `MessageMedia`/`{mimetype,data}` selain URL & berkas lokal. Kalau
+  gambarnya tidak bisa diunduh/dikirim, notifikasi teks tetap dikirim. Teksnya
+  `R.buktiMasuk()` supaya bisa diuji tanpa Chrome. Verifikasi manual oleh admin,
+  lalu pembeli dikabari lewat `proses`/`done`. Periksa urutan di `route()`: bukti
+  harus diperiksa SEBELUM pencarian, kalau tidak "sudah transfer" dianggap nama
+  produk. Jangan kembalikan balasan ke pembeli di jalur ini.
 - **Chrome harus 146.** Chrome lebih baru (termasuk Flatpak) membuat inject
   gagal (`Execution context was destroyed`). Pasang via `@puppeteer/browsers`.
 
