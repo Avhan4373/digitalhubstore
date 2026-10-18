@@ -203,8 +203,8 @@ Tanpa token yang cocok, seluruh endpoint `/api/bot/*` menolak semua permintaan.
 
 | Variabel | Arti |
 |---|---|
-| `BOT_API_URL` | URL Laravel, mis. `https://store.avhanapp.my.id` |
-| `BOT_API_TOKEN` | **wajib**, sama dengan token di Laravel |
+| `BOT_API_URL` | URL Laravel: `https://store.avhanapp.my.id` (produksi/VPS) atau `http://127.0.0.1:8000` (dev lokal) |
+| `BOT_API_TOKEN` | **wajib**, sama dengan token di Laravel **pada server yang dituju** — token lokal dan VPS berbeda |
 | `BOT_ADMIN_NUMBERS` | nomor admin (boleh `08…` atau `62…`), dipisah koma: penerima notifikasi pesanan baru **dan** bukti transfer, sekaligus satu-satunya nomor yang boleh mengetik `proses`/`done` |
 | `BOT_CHROME_PATH` | path Chrome; kosong = cari otomatis |
 | `BOT_ALLOWLIST` | kalau diisi, hanya nomor ini yang dilayani (uji produksi) |
