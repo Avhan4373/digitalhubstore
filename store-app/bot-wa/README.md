@@ -39,10 +39,12 @@ tampilan WhatsApp. Balasan pertama bot dikirim sebagai **reply/quote** ke pesan
 pembeli (terutama terlihat di grup), sisanya pesan biasa.
 
 **Bukti transfer tidak dibalas bot.** Gambar (atau teks "sudah transfer", "bukti",
-"tf") tidak dibalas — **kecuali** kalau nomor pengirim belum pernah membuat
-pesanan sama sekali: bukti seperti itu ditolak dengan arahan memilih produk dulu,
-dan admin tidak dikabari (mencegah notifikasi palsu dari orang yang belum order).
-Sebagai gantinya, untuk bukti yang sah, bot mengirim **notifikasi ke chat
+"tf") tidak dibalas dan **selalu** diteruskan ke admin, tanpa syarat apa pun.
+Tidak ada validasi "sudah order atau belum" — dulu ada, tapi salah sasaran:
+`pay` hanya menampilkan QRIS dan tidak membuat pesanan, jadi pembeli yang
+membayar lewat `pay` lalu mengirim bukti selalu ditolak (dan bukti yang ditolak
+tidak dikabarkan ke admin, sehingga pembayaran nyata bisa hilang tanpa jejak).
+Bot mengirim **notifikasi ke chat
 pribadi tiap nomor di `BOT_ADMIN_NUMBERS`**. Kalau pembeli mengirim **gambar**,
 gambarnya ikut diteruskan dan keterangan di bawah jadi caption-nya (satu pesan):
 
@@ -82,7 +84,7 @@ ditanyakan sebelum pesanan dibuat.
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog gaya papan menu + tanggal/jam WIB |
 | nama produk (`canva`, `netflix`) | cari produk |
 | `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS). **Selalu langsung dikirim**, tanpa syarat sudah memilih produk |
-| gambar / "sudah transfer" / "bukti" | **tidak dibalas** bila nomor punya pesanan — admin mengecek manual lalu mengabari lewat `proses`/`done`. Nomor yang belum pernah order ditolak dengan arahan `list` |
+| gambar / "sudah transfer" / "bukti" | **tidak dibalas**, selalu diteruskan ke admin — admin mengecek manual lalu mengabari lewat `proses`/`done`. Tanpa syarat "harus sudah order" |
 | `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
 | `bantuan` / `cs` | panduan + tautan admin |
@@ -248,7 +250,7 @@ memakai nomor WhatsApp pengirim yang sebenarnya.
 Seluruh alur bisa diuji tanpa Chrome dan tanpa scan QR:
 
 ```bash
-npm test          # 104 test: parser, format, filter WA, katalog, alur percakapan
+npm test          # 106 test: parser, format, filter WA, katalog, alur percakapan
 npm run simulate  # coba percakapan langsung di terminal
 npm run cek       # periksa token + katalog ke Laravel (tanpa kirim pesan)
 ```

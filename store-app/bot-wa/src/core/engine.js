@@ -192,48 +192,23 @@ function isBukti(ctx, aksi) {
 }
 
 /**
- * Apakah nomor ini punya pesanan nyata di server?
- *
- * Ini satu-satunya sumber kebenaran untuk "sudah order atau belum". State
- * percakapan TIDAK bisa dipakai: `buatPesanan()` memanggil `clearState()`
- * begitu pesanan dibuat, jadi pembeli yang sudah order justru tidak punya
- * state — sementara pembeli yang baru membuka detail produk punya state
- * tanpa pesanan sama sekali.
- *
- * - `true`  : ada pesanan yang masih berlaku (termasuk yang sudah lunas,
- *             supaya pembeli yang mengirim bukti ulang tidak ditolak).
- * - `false` : tidak ada pesanan sama sekali / semuanya batal-kedaluwarsa.
- * - `null`  : belum bisa validasi (nomor LID belum jadi nomor HP, atau API
- *             gagal) -> pemanggil memutuskan sendiri, jangan memblokir.
- */
-async function punyaPesananAktif(nomor) {
-    if (!nomor || !nomorValid(nomor)) return null;
-
-    try {
-        const { orders } = await api.orderHistory(nomor);
-
-        return (orders || []).some(
-            (o) => !['cancelled', 'failed', 'expired'].includes(o.order_status),
-        );
-    } catch {
-        return null;
-    }
-}
-
-/**
  * Jawaban untuk sebuah bukti transfer (gambar atau teks kata kunci).
- * Bot tidak membalas pembeli yang punya pesanan (`bukti: true`), tapi menolak
- * bila nomor itu belum pernah order — agar tidak membanjiri admin dengan
- * notifikasi palsu. Kalau validasi tidak mungkin dilakukan, bukti tetap
- * diteruskan (admin yang menilai).
+ *
+ * Bot TIDAK membalas pembeli (`replies` kosong); notifikasi dikirim ke ADMIN
+ * oleh `src/index.js` (`beritahuBukti`). Verifikasi pembayaran manual, dan
+ * pembeli baru mendengar kabar lewat perintah admin `proses`/`done`.
+ *
+ * SENGAJA TANPA validasi "sudah order atau belum". Dulu bukti dari nomor yang
+ * tidak punya pesanan aktif ditolak, dan itu salah sasaran:
+ *   - `pay` hanya menampilkan QRIS, tidak membuat pesanan — jadi pembeli yang
+ *     membayar lalu mengirim bukti SELALU ditolak;
+ *   - pembeli lama yang pesanannya `cancelled`/`expired` lalu bayar ulang juga
+ *     ditolak;
+ *   - bukti yang ditolak tidak dikabarkan ke admin, jadi pembayaran nyata bisa
+ *     hilang tanpa jejak.
+ * Admin tetap menerima nomor pengirim apa adanya dan bisa menilai sendiri.
  */
-async function buktiAtauTolak(nomor) {
-    const valid = await punyaPesananAktif(nomor);
-
-    if (valid === false) {
-        return { replies: [R.buktiTidakValid()], buktiDitolak: true };
-    }
-
+function buktiDiterima() {
     return { replies: [], bukti: true };
 }
 
@@ -347,13 +322,11 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Gambar selalu dianggap bukti transfer, apa pun teksnya (bisa kosong).
     // Bot TIDAK membalas: verifikasi pembayaran dilakukan admin secara manual,
     // dan pembeli baru mendengar kabar lewat perintah admin `proses`/`done`.
-    //
-    // Tapi bukti hanya DITERIMA dari pembeli yang punya pesanan pending — supaya
-    // user lain (mis. user2) yang belum order tidak mengirimkan notifikasi
-    // palsu ke admin. Validasi ada di `buktiAtauTolak()`. Gambar di-cek PERTAMA
-    // sebelum perintah lain supaya "gambar + proses" tetap dianggap bukti.
+    // TIDAK ada validasi "sudah order atau belum" — lihat `buktiDiterima()`.
+    // Gambar di-cek PERTAMA sebelum perintah lain supaya "gambar + proses"
+    // tetap dianggap bukti.
     if (ctx.hasMedia) {
-        return buktiAtauTolak(nomor);
+        return buktiDiterima();
     }
 
     // ---------------------------------------------------------------- global
@@ -460,8 +433,9 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Tidak ada syarat apa pun: `pay` selalu langsung menampilkan QR. Pembeli
     // memakainya untuk melihat QRIS resmi kapan saja (termasuk sebelum memilih
     // paket, atau untuk membayar ulang), dan admin memakainya saat verifikasi
-    // manual. Validasi "sudah order atau belum" hanya berlaku untuk bukti
-    // transfer (lihat `buktiAtauTolak`), bukan untuk `pay`.
+    // manual. `pay` TIDAK membuat pesanan, jadi jangan menambahkan syarat
+    // "sudah order" di sini — pembeli yang membayar lewat `pay` lalu mengirim
+    // bukti tidak akan punya pesanan untuk divalidasi.
     if (aksi.type === 'pay') {
         clearState(chatId);
         const data = await ambilKatalog();
@@ -506,11 +480,9 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // ---------------------------------------------------------- bukti transfer
     // Diperiksa sebelum pencarian: "sudah transfer" bukan nama produk. Sama
     // seperti gambar, pesan ini TIDAK dibalas bot — admin yang mengabari
-    // pembeli lewat `proses`/`done` setelah mengecek pembayaran. Validasi
-    // order pending juga diterapkan (`buktiAtauTolak`), jadi pembeli yang belum
-    // order tidak bisa mengirim notifikasi palsu.
+    // pembeli lewat `proses`/`done` setelah mengecek pembayaran.
     if (isBukti(ctx, aksi)) {
-        return buktiAtauTolak(nomor);
+        return buktiDiterima();
     }
 
     // -------------------------------------------------------------- pencarian

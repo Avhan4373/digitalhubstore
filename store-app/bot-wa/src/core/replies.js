@@ -521,20 +521,6 @@ export function fallback() {
     ].join('\n');
 }
 
-/**
- * Bukti transfer yang dikirim oleh nomor yang **belum pernah membuat pesanan**
- * — ditolak supaya admin tidak dapat notifikasi palsu.
- */
-export function buktiTidakValid() {
-    return [
-        '⚠️ *Bukti transfer tidak dikenali.*',
-        '',
-        'Saya tidak menemukan pesanan di nomor ini.',
-        '',
-        'Pilih produk dulu lewat *list*, baru kirim bukti setelah checkout.',
-    ].join('\n');
-}
-
 // ------------------------------------------------------------ atur grup (admin)
 
 /**

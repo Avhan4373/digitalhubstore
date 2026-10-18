@@ -430,7 +430,13 @@ test('kirim bukti transfer (gambar): bot DIAM, tidak ada balasan', async () => {
 
     assert.deepEqual(hasil.replies, [], 'tidak boleh ada balasan apa pun');
     assert.equal(hasil.bukti, true);
-    assert.ok(panggilan.some((p) => p.path === '/api/bot/pesanan/riwayat'), 'validasi bukti cek order pending via orderHistory');
+    // Validasi "sudah order atau belum" sudah dihapus: bukti langsung diteruskan
+    // ke admin tanpa memanggil API.
+    assert.equal(
+        panggilan.some((p) => p.path === '/api/bot/pesanan/riwayat'),
+        false,
+        'bukti tidak perlu memanggil orderHistory lagi',
+    );
 });
 
 test('kirim bukti transfer (teks): bot DIAM, tidak ada balasan', async () => {
@@ -471,7 +477,12 @@ test('notifikasi bukti ke admin: chat pribadi tanpa pesanan dikenali', () => {
     assert.doesNotMatch(teks, /🧾/);
 });
 
-test("bukti dari nomor tanpa pesanan -> ditolak, tidak ke admin", async () => {
+// Bukti transfer TIDAK divalidasi "sudah order atau belum". Dulu nomor yang
+// tidak punya pesanan aktif ditolak, dan itu salah sasaran: `pay` hanya
+// menampilkan QRIS tanpa membuat pesanan, jadi pembeli yang membayar lewat
+// `pay` lalu mengirim bukti SELALU ditolak — dan bukti yang ditolak tidak
+// dikabarkan ke admin, sehingga pembayaran nyata bisa hilang tanpa jejak.
+test("bukti dari nomor tanpa pesanan tetap diteruskan ke admin", async () => {
     stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
     engine.resetRateLimit("628999888777");
 
@@ -482,14 +493,56 @@ test("bukti dari nomor tanpa pesanan -> ditolak, tidak ke admin", async () => {
         nama: "User Dua",
     });
 
-    assert.equal(hasil.bukti, undefined, "bukan notifikasi ke admin");
-    assert.equal(hasil.buktiDitolak, true);
-    assert.match(hasil.replies[0], /tidak menemukan pesanan di nomor ini/);
-    assert.ok(panggilan.some((p) => p.path === "/api/bot/pesanan/riwayat"));
+    assert.equal(hasil.bukti, true, "harus diteruskan ke admin");
+    assert.deepEqual(hasil.replies, [], "bot tetap diam ke pembeli");
 });
 
-// Pembeli yang SUDAH lunas lalu mengirim bukti ulang tetap diteruskan ke admin
-// (bukan ditolak) — dulu syaratnya `!is_paid` sehingga kasus ini salah tolak.
+// Regresi kasus nyata di log (16:38): `pay` -> kirim gambar bukti, tanpa
+// pernah membuat pesanan. Bukti harus sampai ke admin.
+test("alur pay lalu kirim bukti: gambar diteruskan walau tanpa pesanan", async () => {
+    stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
+    engine.resetRateLimit("6282395124106");
+
+    await engine.handlePesan({
+        teks: "pay",
+        nomor: "6282395124106",
+        chatId: "grup-bukti",
+        nama: "Admin",
+    });
+
+    const hasil = await engine.handlePesan({
+        teks: "",
+        nomor: "6282395124106",
+        chatId: "grup-bukti",
+        nama: "Admin",
+        hasMedia: true,
+    });
+
+    assert.equal(hasil.bukti, true);
+    assert.deepEqual(hasil.replies, []);
+});
+
+// Bukti tidak boleh memanggil API sama sekali: tidak ada lagi yang perlu
+// divalidasi, jadi satu permintaan jaringan per gambar terbuang percuma.
+test("bukti tidak memanggil endpoint riwayat lagi", async () => {
+    stubFetch(() => ({ orders: [] }));
+    engine.resetRateLimit("628111222333");
+
+    await engine.handlePesan({
+        teks: "sudah transfer ya",
+        nomor: "628111222333",
+        chatId: "dm-bukti",
+        nama: "Pembeli",
+    });
+
+    assert.equal(
+        panggilan.some((p) => p.path === "/api/bot/pesanan/riwayat"),
+        false,
+        "validasi bukti sudah dihapus, endpoint riwayat tidak boleh dipanggil",
+    );
+});
+
+// Pembeli yang SUDAH lunas lalu mengirim bukti ulang tetap diteruskan ke admin.
 test("bukti dari nomor dengan pesanan lunas tetap diteruskan ke admin", async () => {
     stubFetch((path) => (path === "/api/bot/pesanan/riwayat"
         ? { orders: [{ ...PESANAN, is_paid: true, payment_status: 'paid', can_pay: false }] }
