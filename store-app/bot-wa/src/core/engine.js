@@ -264,17 +264,22 @@ export async function handlePesan({
 /**
  * Pengumuman transaksi dari admin (`proses` = pending, `done` = berhasil).
  *
- * Semua nilai dari konteks nyata: nama grup WhatsApp tempat perintah ditulis
- * (fallback nama toko), catatan dari teks perintah — kalau kosong dari pesanan
- * terakhir yang dibuat bot di chat itu — dan nama pembeli dari pesanan itu.
+ * Semua nilai dari konteks nyata: jam & tanggal WIB saat perintah ditulis,
+ * nama grup WhatsApp tempat perintah ditulis (fallback nama toko), dan
+ * catatan — dari teks perintah dahulu, lalu dari pesanan terakhir di chat itu.
+ *
+ * Bot **selalu** mengirimkan TRANSAKSI PENDING/DONE: jika belum ada catatan,
+ * field `📝 Catatan` saja diabaikan — admin diharapkan melengkapi secara manual
+ * di panel. Jangan meminta admin menulis catatan lewat balasan bot, karena itu
+ * hanya menambah langkah sebelum pembeli diberi tahu.
+ *
+ * @param {object} aksi
+ * @param {'admin_proses'|'admin_done'} aksi.type
+ * @param {string} [aksi.catatan] catatan diketik admin (boleh kosong)
  */
 async function notifikasiTransaksi(aksi, ctx) {
     const transaksi = ctx.transaksiTerakhir || null;
     const catatan = String(aksi.catatan || transaksi?.catatan || '').trim();
-
-    if (catatan === '') {
-        return { replies: [R.transaksiTanpaCatatan()] };
-    }
 
     const store = await infoToko();
 
@@ -283,7 +288,6 @@ async function notifikasiTransaksi(aksi, ctx) {
             status: aksi.type === 'admin_done' ? 'berhasil' : 'pending',
             grup: ctx.grup || store.name,
             catatan,
-            pembeli: transaksi?.pembeli || '',
         })],
     };
 }

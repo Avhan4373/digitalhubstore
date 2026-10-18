@@ -341,12 +341,17 @@ test('admin: grup kosong jatuh ke nama toko', async () => {
     assert.doesNotMatch(replies[0], /📂 Grup {5}: $/m);
 });
 
-test('admin: tanpa catatan dan tanpa pesanan -> minta catatan, bukan pengumuman', async () => {
+test('admin: proses tanpa catatan dan tanpa pesanan tetap kirim TRANSAKSI PENDING (tidak minta catatan)', async () => {
     const { replies } = await kirim('proses');
 
-    assert.doesNotMatch(replies[0], /TRANSAKSI PENDING/);
-    assert.match(replies[0], /Belum ada catatan transaksi/);
-    assert.match(replies[0], /\*proses GPT PLUS SHARE 1 BULAN\*/);
+    const teks = replies[0];
+
+    // Bot tetap mengumumkan, bukan meminta admin menulis catatan.
+    assert.match(teks, /^\*_TRANSAKSI PENDING ✅ 」_\*$/m);
+    assert.doesNotMatch(teks, /Belum ada catatan transaksi/);
+    assert.doesNotMatch(teks, /proses GPT/);
+    // Catatan kosong -> field 📝 Catatan tidak ditampilkan.
+    assert.doesNotMatch(teks, /📝 Catatan/m);
 });
 
 test('pembeli (bukan admin) mengetik proses tidak dapat pengumuman transaksi', async () => {

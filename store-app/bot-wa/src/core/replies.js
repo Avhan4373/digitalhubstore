@@ -196,9 +196,9 @@ export function pembayaranResmi(store, adaQris = Boolean(store.qris_url)) {
  * dan catatan pesanan. Pesan hanya berisi ringkasan ini — cukup sampai
  * catatan, tidak ada kalimat penutup.
  *
- * @param {{status: 'pending'|'berhasil', grup?: string, catatan: string, date?: Date}} data
+ * @param {{status: 'pending'|'berhasil', grup?: string, catatan?: string, date?: Date}} data
  */
-export function transaksi({ status, grup = '', catatan, date = new Date() }) {
+export function transaksi({ status, grup = '', catatan = '', date = new Date() }) {
     const { tanggal, jam } = tanggalWaktuWIB(date);
     const judul = status === 'berhasil'
         ? '*_TRANSAKSI BERHASIL「 ✅ 」_*'
@@ -210,24 +210,15 @@ export function transaksi({ status, grup = '', catatan, date = new Date() }) {
         `⏰ Jam      : ${jam}`,
         `📅 Tanggal  : ${tanggal}`,
         `📂 Grup     : ${grup}`,
-        `📝 Catatan  : ${catatan}`,
     ];
 
-    return baris.join('\n');
-}
+    // Catatan boleh kosong (admin belum melengkapi) — jangan tampilkan baris
+    // "📝 Catatan  : " yang kosong, biarkan bot tetap kirim TRANSAKSI pending.
+    if (catatan !== '') {
+        baris.push(`📝 Catatan  : ${catatan}`);
+    }
 
-/**
- * Admin mengetik `proses`/`done` tanpa catatan dan tanpa pesanan yang dikenali
- * di chat itu — bot minta catatannya supaya pesan ke pembeli tidak kosong.
- */
-export function transaksiTanpaCatatan() {
-    return [
-        '⚠️ Belum ada catatan transaksi di chat ini.',
-        '',
-        'Tulis catatannya sekalian, mis.:',
-        '*proses GPT PLUS SHARE 1 BULAN*',
-        '*done GPT PLUS SHARE 1 BULAN*',
-    ].join('\n');
+    return baris.join('\n');
 }
 
 /**
