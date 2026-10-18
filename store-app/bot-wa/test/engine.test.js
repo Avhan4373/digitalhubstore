@@ -286,6 +286,78 @@ test('pencarian satu hasil langsung membuka detail', async () => {
     assert.match(replies[0], /^\*NETFLIX\*$/m);
 });
 
+// ------------------------------------------------------- notifikasi transaksi
+
+const TRANSAKSI = {
+    invoice: 'INV261018ABCDE',
+    pembeli: 'Mustaqim / Afik',
+    catatan: 'GPT PLUS SHARE 1 BULAN',
+};
+
+test('admin: proses mengirim pengumuman TRANSAKSI PENDING di grup', async () => {
+    const { replies } = await kirim('proses', {
+        grup: 'DIGITALHUB OFFICIAL',
+        transaksiTerakhir: TRANSAKSI,
+    });
+
+    const teks = replies[0];
+
+    assert.match(teks, /^\*_TRANSAKSI PENDING ✅ 」_\*$/m);
+    assert.match(teks, /⏰ Jam {6}: \d{2}:\d{2}:\d{2} WIB/);
+    assert.match(teks, /📅 Tanggal {2}: \d{1,2} \w+ 20\d{2}/);
+    assert.match(teks, /📂 Grup {5}: DIGITALHUB OFFICIAL/);
+    assert.match(teks, /📝 Catatan {2}: GPT PLUS SHARE 1 BULAN/);
+    assert.match(teks, /@Mustaqim \/ Afik _Terima kasih sudah order!_$/);
+});
+
+test('admin: done mengirim pengumuman TRANSAKSI BERHASIL', async () => {
+    const { replies } = await kirim('done', {
+        grup: 'DIGITALHUB OFFICIAL',
+        transaksiTerakhir: TRANSAKSI,
+    });
+
+    const teks = replies[0];
+
+    assert.match(teks, /^\*_TRANSAKSI BERHASIL「 ✅ 」_\*$/m);
+    assert.match(teks, /📝 Catatan {2}: GPT PLUS SHARE 1 BULAN/);
+});
+
+test('admin: catatan dari teks perintah menang atas pesanan terakhir', async () => {
+    const { replies } = await kirim('proses LANDING PAGE 1 TAHUN', {
+        grup: 'Grup Uji',
+        transaksiTerakhir: TRANSAKSI,
+    });
+
+    assert.match(replies[0], /📝 Catatan {2}: LANDING PAGE 1 TAHUN/);
+});
+
+test('admin: grup kosong jatuh ke nama toko', async () => {
+    const { replies } = await kirim('proses', { transaksiTerakhir: TRANSAKSI });
+
+    assert.match(replies[0], /📂 Grup {5}: Creative Solutions/);
+    assert.doesNotMatch(replies[0], /📂 Grup {5}: $/m);
+});
+
+test('admin: tanpa catatan dan tanpa pesanan -> minta catatan, bukan pengumuman', async () => {
+    const { replies } = await kirim('proses');
+
+    assert.doesNotMatch(replies[0], /TRANSAKSI PENDING/);
+    assert.match(replies[0], /Belum ada catatan transaksi/);
+    assert.match(replies[0], /\*proses GPT PLUS SHARE 1 BULAN\*/);
+});
+
+test('pembeli (bukan admin) mengetik proses tidak dapat pengumuman transaksi', async () => {
+    const { replies } = await engine.handlePesan({
+        teks: 'proses',
+        nomor: '628111222333',
+        chatId: 'chat-uji',
+        grup: 'Grup Uji',
+        transaksiTerakhir: TRANSAKSI,
+    });
+
+    assert.doesNotMatch(replies.join('\n'), /TRANSAKSI/);
+});
+
 // ------------------------------------------------------------- info pembayaran
 
 test('pay menampilkan nomor owner resmi + QRIS resmi dalam SATU pesan', async () => {

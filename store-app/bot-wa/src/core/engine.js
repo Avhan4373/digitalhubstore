@@ -202,7 +202,16 @@ function isBukti(ctx, aksi) {
  * @param {string} [params.nama] nama tampilan WhatsApp (dipakai untuk invoice)
  * @param {boolean} [params.hasMedia] pesan membawa gambar (bukti transfer)
  * */
-export async function handlePesan({ teks, nomor, chatId, batasRate = 20, nama = '', hasMedia = false }) {
+export async function handlePesan({
+    teks,
+    nomor,
+    chatId,
+    batasRate = 20,
+    nama = '',
+    hasMedia = false,
+    grup = '',
+    transaksiTerakhir = null,
+}) {
     const nomorBersih = normalisasiNomor(nomor);
 
     const tunggu = kenaRateLimit(nomorBersih || chatId, batasRate);
@@ -214,7 +223,17 @@ export async function handlePesan({ teks, nomor, chatId, batasRate = 20, nama = 
 
     const aksi = parsePesan(teks);
     const state = getState(chatId);
-    const ctx = { nama, hasMedia, teks: String(teks || '') };
+    const ctx = {
+        nama,
+        hasMedia,
+        teks: String(teks || ''),
+        /** Nama grup WhatsApp (kosong kalau chat pribadi). */
+        grup,
+        /** Pesanan terakhir yang dibuat bot di chat ini (lihat index.js). */
+        transaksiTerakhir,
+        /** Perintah `proses`/`done` hanya untuk nomor admin. */
+        admin: nomorBersih !== '' && config.adminNumbers.includes(nomorBersih),
+    };
 
     try {
         return await route(aksi, state, chatId, nomorBersih, ctx);
@@ -240,6 +259,33 @@ export async function handlePesan({ teks, nomor, chatId, batasRate = 20, nama = 
 
         throw e;
     }
+}
+
+/**
+ * Pengumuman transaksi dari admin (`proses` = pending, `done` = berhasil).
+ *
+ * Semua nilai dari konteks nyata: nama grup WhatsApp tempat perintah ditulis
+ * (fallback nama toko), catatan dari teks perintah — kalau kosong dari pesanan
+ * terakhir yang dibuat bot di chat itu — dan nama pembeli dari pesanan itu.
+ */
+async function notifikasiTransaksi(aksi, ctx) {
+    const transaksi = ctx.transaksiTerakhir || null;
+    const catatan = String(aksi.catatan || transaksi?.catatan || '').trim();
+
+    if (catatan === '') {
+        return { replies: [R.transaksiTanpaCatatan()] };
+    }
+
+    const store = await infoToko();
+
+    return {
+        replies: [R.transaksi({
+            status: aksi.type === 'admin_done' ? 'berhasil' : 'pending',
+            grup: ctx.grup || store.name,
+            catatan,
+            pembeli: transaksi?.pembeli || '',
+        })],
+    };
 }
 
 async function route(aksi, state, chatId, nomor, ctx) {
@@ -273,6 +319,18 @@ async function route(aksi, state, chatId, nomor, ctx) {
     if (aksi.type === 'invoice') {
         clearState(chatId);
         return cekInvoice(aksi.invoice, nomor);
+    }
+
+    // ------------------------------------------------- notifikasi admin
+    // Admin menulis `proses <catatan>` (pending) atau `done <catatan>`
+    // (berhasil); bot mengirim pengumuman transaksi ke chat itu. Pembeli yang
+    // menulis kata yang sama TIDAK dilayani — diperlakukan sebagai pencarian.
+    if (aksi.type === 'admin_proses' || aksi.type === 'admin_done') {
+        // State percakapan pembeli TIDAK dihapus: pengumuman admin tidak ada
+        // hubungannya dengan keranjang/percakapan yang sedang jalan.
+        if (ctx.admin) return notifikasiTransaksi(aksi, ctx);
+
+        aksi = { ...aksi, type: 'cari', kata: aksi.teks };
     }
 
     // --------------------------------------------- state yang menunggu isian

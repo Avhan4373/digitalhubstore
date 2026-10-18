@@ -101,6 +101,21 @@ export function pecahPesan(text, batas = BATAS_PESAN) {
     return out;
 }
 
+/**
+ * Catatan transaksi dari pesanan, mis. "GEMINI PRO SHARING 1 BULAN".
+ *
+ * Dipakai perintah admin `proses`/`done` kalau admin tidak menulis catatan
+ * sendiri: nama produk + varian dari pesanan terakhir di chat itu, huruf besar
+ * seperti format pesan transaksi.
+ */
+export function catatanPesanan(order) {
+    const isi = (order?.items || [])
+        .map((item) => [item.product_name, item.variant_name].filter(Boolean).join(' '))
+        .join(', ');
+
+    return isi.replace(/\s+/g, ' ').trim().toUpperCase();
+}
+
 /** Escape karakter yang di WhatsApp punya arti khusus (*, _, ~, `). */
 export function escapeWa(text) {
     return String(text || '').replace(/([*_~`])/g, '\\$1');

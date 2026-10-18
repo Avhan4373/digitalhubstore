@@ -21,6 +21,21 @@ test('parse: pay / payment jadi perintah info pembayaran', () => {
     }
 });
 
+test('parse: perintah admin proses/done (dengan atau tanpa catatan)', () => {
+    assert.equal(parsePesan('proses').type, 'admin_proses');
+    assert.equal(parsePesan('pending').type, 'admin_proses');
+    assert.equal(parsePesan('done').type, 'admin_done');
+    assert.equal(parsePesan('selesai').type, 'admin_done');
+
+    const pending = parsePesan('proses GPT PLUS SHARE 1 BULAN');
+    assert.equal(pending.type, 'admin_proses');
+    assert.equal(pending.catatan, 'GPT PLUS SHARE 1 BULAN');
+
+    const selesai = parsePesan('done gpt plus share 1 bulan');
+    assert.equal(selesai.type, 'admin_done');
+    assert.equal(selesai.catatan, 'gpt plus share 1 bulan', 'catatan tidak diubah hurufnya');
+});
+
 test('parse: invoice dikenali sebelum perintah lain', () => {
     assert.deepEqual(parsePesan('INV261017ABCDE'), { type: 'invoice', invoice: 'INV261017ABCDE', teks: 'INV261017ABCDE' });
     assert.deepEqual(parsePesan('inv261017abcde'), { type: 'invoice', invoice: 'INV261017ABCDE', teks: 'inv261017abcde' });

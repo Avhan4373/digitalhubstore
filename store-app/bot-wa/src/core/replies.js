@@ -189,6 +189,49 @@ export function pembayaranResmi(store, adaQris = Boolean(store.qris_url)) {
 }
 
 /**
+ * Notifikasi transaksi oleh ADMIN di chat (`proses` = pending, `done` = berhasil).
+ *
+ * Semua nilai berasal dari konteks nyata: jam & tanggal WIB saat perintah
+ * dikirim, nama grup WhatsApp tempat perintah ditulis (fallback nama toko),
+ * catatan pesanan, dan nama pembeli dari pesanan terakhir di chat itu.
+ *
+ * @param {{status: 'pending'|'berhasil', grup?: string, catatan: string, pembeli?: string, date?: Date}} data
+ */
+export function transaksi({ status, grup = '', catatan, pembeli = '', date = new Date() }) {
+    const { tanggal, jam } = tanggalWaktuWIB(date);
+    const judul = status === 'berhasil'
+        ? '*_TRANSAKSI BERHASIL「 ✅ 」_*'
+        : '*_TRANSAKSI PENDING ✅ 」_*';
+
+    const baris = [
+        judul,
+        '',
+        `⏰ Jam      : ${jam}`,
+        `📅 Tanggal  : ${tanggal}`,
+        `📂 Grup     : ${grup}`,
+        `📝 Catatan  : ${catatan}`,
+        '',
+        `${pembeli ? `@${pembeli} ` : ''}_Terima kasih sudah order!_`,
+    ];
+
+    return baris.join('\n');
+}
+
+/**
+ * Admin mengetik `proses`/`done` tanpa catatan dan tanpa pesanan yang dikenali
+ * di chat itu — bot minta catatannya supaya pesan ke pembeli tidak kosong.
+ */
+export function transaksiTanpaCatatan() {
+    return [
+        '⚠️ Belum ada catatan transaksi di chat ini.',
+        '',
+        'Tulis catatannya sekalian, mis.:',
+        '*proses GPT PLUS SHARE 1 BULAN*',
+        '*done GPT PLUS SHARE 1 BULAN*',
+    ].join('\n');
+}
+
+/**
  * Detail satu produk + daftar paket, gaya "menu toko": judul produk huruf
  * besar, lalu tiap paket dalam bentuk "Nama : *harga*" — harga tanpa "Rp",
  * diikuti catatan data wajib (`required_fields`) berhuruf miring matematika.

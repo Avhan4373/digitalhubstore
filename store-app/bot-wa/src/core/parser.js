@@ -18,6 +18,14 @@ const ALIAS = {
     pay: ['pay', 'payment', 'pembayaran', 'bayar'],
 };
 
+/**
+ * Perintah ADMIN di chat (notifikasi transaksi ke pembeli). Ditangani terpisah
+ * dari ALIAS karena boleh diikuti catatan: "proses GPT PLUS SHARE 1 BULAN".
+ * Hanya nomor admin (BOT_ADMIN_NUMBERS) yang dilayani — lihat route().
+ */
+const ADMIN_PENDING = ['proses', 'pending', 'diproses'];
+const ADMIN_DONE = ['done', 'selesai', 'berhasil'];
+
 function normalisasi(text) {
     return String(text || '')
         .trim()
@@ -83,13 +91,26 @@ export function parsePesan(teks) {
         return bungkus({ type: 'pilih_produk', nomor: Number(listNomor[1]) });
     }
 
+    // 2. Perintah admin: "proses" / "proses GPT PLUS SHARE 1 BULAN" (begitu juga
+    //    "done"/"selesai"/"berhasil"). Catatan diambil dari teks ASLI supaya
+    //    huruf besar/kecilnya tidak berubah.
+    const [kataPertama, ...sisaKata] = asli.split(/\s+/);
+    const kunciAdmin = kataPertama.toLowerCase();
+
+    if (ADMIN_PENDING.includes(kunciAdmin) || ADMIN_DONE.includes(kunciAdmin)) {
+        return bungkus({
+            type: ADMIN_DONE.includes(kunciAdmin) ? 'admin_done' : 'admin_proses',
+            catatan: sisaKata.join(' ').trim(),
+        });
+    }
+
     // 3. Perintah teks
     const perintah = cocokAlias(teks2);
     if (perintah) {
         return bungkus({ type: perintah });
     }
 
-    // 3. Angka polos: pilih produk atau varian tergantung state
+    // 4. Angka polos: pilih produk atau varian tergantung state
     if (/^\d{1,3}$/.test(teks2)) {
         return bungkus({ type: 'angka', nomor: Number(teks2) });
     }
@@ -105,6 +126,5 @@ export function parsePesan(teks) {
         return bungkus({ type: 'order_varian', nomor: Number(orderNomor[1]) });
     }
 
-    // 4. Teks bebas -> pencarian
-    return bungkus({ type: 'cari', kata: asli });
-}
+    // 5. Teks bebas -> pencarian
+    return bungkus({ type: 'cari', kata: asli });}

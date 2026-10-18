@@ -159,6 +159,13 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   pesanan yang dibuat bot tiap 60 detik dan mengirim isi akun begitu statusnya
   `delivered`/`completed`. Pemicunya tetap admin di panel — bot tidak boleh
   menandai pesanan sendiri.
+- **Perintah admin `proses`/`done`** (`admin_proses`/`admin_done`) hanya dilayani
+  untuk nomor di `BOT_ADMIN_NUMBERS`; pembeli yang mengetik kata itu diperlakukan
+  sebagai pencarian produk. Bot hanya mengirim **pengumuman** (jam/tanggal WIB,
+  nama grup WhatsApp tempat perintah ditulis, catatan, nama pembeli) dan tidak
+  mengubah status pesanan — verifikasi tetap di panel. Catatan/nama pembeli dari
+  pesanan terakhir per chat (`transaksiTerakhir` di `src/index.js`); perintah ini
+  tidak menghapus sesi percakapan pembeli.
 - **Filter pesan wajib** (`core/wa-filter.js`): `fromMe`, `isStatus`,
   `broadcast`, `@g.us`, `@broadcast`, `@newsletter`. Tanpa `broadcast` bot
   membalas setiap pesan siaran. **Chat pribadi = `@c.us` ATAU `@lid`** (Linked

@@ -574,6 +574,17 @@ export function buatAdapterWhatsApp(handler) {
         const nama = String(msg._data?.notifyName || msg._data?.verifiedName || '').slice(0, 80);
         const hasMedia = Boolean(msg.hasMedia);
         const dariGrup = String(chatId).includes('@g.us');
+
+        // Nama grup (dipakai balasan ADMIN "TRANSAKSI ...": baris 📂 Grup).
+        let grup = '';
+        if (dariGrup) {
+            grup = await msg.getChat()
+                .then((chat) => String(chat?.name || '').slice(0, 80))
+                .catch((e) => {
+                    log.debug(`Nama grup tidak terbaca: ${e.message}`);
+                    return '';
+                });
+        }
         // ID pesan pembeli: dipakai agar balasan pertama menjadi reply/quote
         // ke pesan ini, bukan pesan terpisah.
         const pesanId = idPesanPenuh(msg);
@@ -582,7 +593,7 @@ export function buatAdapterWhatsApp(handler) {
         // Satu pesan error tidak boleh mematikan proses bot.
         try {
             log.info(`Pesan masuk dari ${maskNumber(nomor)}${lid ? ` (lid ${maskNumber(lid)})` : ''}${dariGrup ? ' [grup]' : ''}${hasMedia ? ' [gambar]' : ''}: ${teks.slice(0, 60)}`);
-            await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId });
+            await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup });
         } catch (e) {
             log.error(`Handler pesan gagal: ${e.message}`);
         }

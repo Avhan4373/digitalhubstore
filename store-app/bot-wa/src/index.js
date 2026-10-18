@@ -17,7 +17,7 @@ import { buatAdapterWhatsApp } from './adapters/whatsapp.js';
 import { assertConfig, config } from './config.js';
 import { api } from './core/api.js';
 import { handlePesan, nomorTerdaftar } from './core/engine.js';
-import { pecahPesan } from './core/format.js';
+import { catatanPesanan, pecahPesan } from './core/format.js';
 import { log, maskNumber } from './core/logger.js';
 import { sweepSessions } from './core/session.js';
 import * as R from './core/replies.js';
@@ -40,12 +40,25 @@ let adapter = null;
 /** Invoice yang dibuat bot per chat, untuk poller. @type {Map<string, Set<string>>} */
 const pesananBot = new Map();
 
-function catatPesanan(chatId, invoice) {
-    if (!invoice) return;
+/**
+ * Ringkasan pesanan terakhir per chat: dipakai balasan admin `proses`/`done`
+ * (catatan + nama pembeli). Bukan sumber kebenaran — pesanan aslinya di DB.
+ * @type {Map<string, {invoice: string, pembeli: string, catatan: string}>}
+ */
+const transaksiTerakhir = new Map();
+
+function catatPesanan(chatId, order) {
+    if (!order?.invoice) return;
 
     const set = pesananBot.get(chatId) || new Set();
-    set.add(invoice);
+    set.add(order.invoice);
     pesananBot.set(chatId, set);
+
+    transaksiTerakhir.set(chatId, {
+        invoice: order.invoice,
+        pembeli: String(order.buyer_name || '').trim(),
+        catatan: catatanPesanan(order),
+    });
 }
 
 /**
@@ -121,7 +134,7 @@ async function beritahuAdmin(order) {
     }
 }
 
-async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId }) {
+async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId, grup = '' }) {
     // Allowlist: kalau diisi, hanya nomor itu yang dilayani. Berguna saat
     // mencoba bot di produksi tanpa mengganggu pembeli sungguhan.
     if (config.allowlist.length > 0 && !config.allowlist.includes(nomor)) {
@@ -136,10 +149,12 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
             chatId,
             nama,
             hasMedia,
+            grup,
+            transaksiTerakhir: transaksiTerakhir.get(chatId) || null,
             batasRate: config.rateLimitPerMinute,
         });
 
-        if (hasil.order) catatPesanan(chatId, hasil.order.invoice);
+        if (hasil.order) catatPesanan(chatId, hasil.order);
 
         // Kirim ke CHAT ASAL (adapter yang menyelesaikan tujuan per chat) dan
         // bawa ID pesan pemicu supaya potongan pertama jadi quote/reply.

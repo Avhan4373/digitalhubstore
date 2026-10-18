@@ -77,6 +77,39 @@ tidak ada, bot memakai `qris_url` dari pengaturan toko; kalau dua-duanya kosong,
 teksnya tetap dikirim sebagai pesan biasa dengan peringatan bahwa QRIS belum
 diatur.
 
+## Perintah admin `proses` / `done`
+
+Admin (nomor di `BOT_ADMIN_NUMBERS`) mengetik di chat:
+
+| Ketik | Balasan bot |
+|---|---|
+| `proses` (juga `pending`, `diproses`) | `*_TRANSAKSI PENDING ✅ 」_*` |
+| `done` (juga `selesai`, `berhasil`) | `*_TRANSAKSI BERHASIL「 ✅ 」_*` |
+
+Balasannya memuat jam & tanggal WIB saat perintah ditulis, **nama grup WhatsApp**
+tempat perintah ditulis (di chat pribadi dipakai nama toko), catatan pesanan, dan
+nama pembeli dari pesanan terakhir yang dibuat bot di chat itu:
+
+```
+*_TRANSAKSI PENDING ✅ 」_*
+
+⏰ Jam      : 11:51:20 WIB
+📅 Tanggal  : 18 Oktober 2026
+📂 Grup     : DIGITALHUB OFFICIAL
+📝 Catatan  : GPT PLUS SHARE 1 BULAN
+
+@Mustaqim / Afik _Terima kasih sudah order!_
+```
+
+- Catatan boleh ditulis sendiri: `proses LANDING PAGE 1 TAHUN`. Kalau tidak
+  ditulis, dipakai nama produk + paket dari **pesanan terakhir** yang dibuat bot
+  di chat itu; kalau belum ada pesanan di chat itu, bot meminta catatannya.
+- **Hanya nomor admin.** Pembeli yang mengetik `proses`/`done` tidak dilayani —
+  teksnya diperlakukan sebagai pencarian produk biasa.
+- Bot **tidak** mengubah status pesanan; verifikasi tetap dilakukan admin di
+  panel. Pesan ini hanya pengumuman ke pembeli.
+- Percakapan pembeli yang sedang berjalan di chat itu **tidak** dihapus.
+
 ## Notifikasi pesanan selesai
 
 Bot memeriksa pesanan yang dibuatnya tiap 60 detik. Begitu admin memverifikasi
@@ -114,7 +147,7 @@ Tanpa token yang cocok, seluruh endpoint `/api/bot/*` menolak semua permintaan.
 |---|---|
 | `BOT_API_URL` | URL Laravel, mis. `https://store.avhanapp.my.id` |
 | `BOT_API_TOKEN` | **wajib**, sama dengan token di Laravel |
-| `BOT_ADMIN_NUMBERS` | nomor admin (62xxx), dipisah koma, untuk notifikasi pesanan baru |
+| `BOT_ADMIN_NUMBERS` | nomor admin (62xxx), dipisah koma: penerima notifikasi pesanan baru **dan** satu-satunya nomor yang boleh mengetik `proses`/`done` |
 | `BOT_CHROME_PATH` | path Chrome; kosong = cari otomatis |
 | `BOT_ALLOWLIST` | kalau diisi, hanya nomor ini yang dilayani (uji produksi) |
 | `BOT_GROUP_ALLOWLIST` | ID grup (`@g.us`) yang boleh dilayani; kosong = semua grup diabaikan |
