@@ -460,6 +460,34 @@ test('notifikasi bukti ke admin: chat pribadi tanpa pesanan dikenali', () => {
     assert.doesNotMatch(teks, /🧾/);
 });
 
+// Regression: notifikasi TRANSAKSI PENDING/DONE cukup sampai catatan, tidak
+// ada kalimat penutup "Terima kasih sudah order!" lagi.
+test('transaksi proses: cukup sampai catatan, tidak ada Terima kasih', async () => {
+    const { replies } = await kirim('proses', {
+        grup: 'DIGITALHUB OFFICIAL',
+        transaksiTerakhir: TRANSAKSI,
+    });
+
+    const teks = replies[0];
+
+    assert.match(teks, /📝 Catatan {2}: GPT PLUS SHARE 1 BULAN/);
+    assert.doesNotMatch(teks, /Terima kasih/);
+    assert.doesNotMatch(teks, /@Mustaqim/);
+});
+
+// Regression: admin yang kirim gambar bukti juga tidak dibalas (bukti selalu
+// ke admin, bukan ke pengirim — meski pengirimnya admin).
+test('admin yang kirim bukti gambar: bot tetap DIAM', async () => {
+    await kirim('list');
+    await kirim('1');
+    await kirim('1');
+
+    const hasil = await kirim('', { hasMedia: true }); // nomor = admin
+
+    assert.deepEqual(hasil.replies, [], 'admin yang kirim bukti pun tidak boleh dibalas');
+    assert.equal(hasil.bukti, true);
+});
+
 // ------------------------------------------------------------------ pesanan
 
 test('invoice memanggil status pesanan', async () => {
