@@ -158,7 +158,18 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   `broadcast`, `@g.us`, `@broadcast`, `@newsletter`. Tanpa `broadcast` bot
   membalas setiap pesan siaran. **Chat pribadi = `@c.us` ATAU `@lid`** (Linked
   Identity) — filter lama yang hanya menerima `@c.us` membuat bot mengabaikan
-  SEMUA pesan masuk.
+  SEMUA pesan masuk. Grup hanya dilayani kalau ID-nya didaftarkan eksplisit di
+  `BOT_GROUP_ALLOWLIST` (grup uji coba sendiri); default tetap kosong supaya
+  grup pelanggan tidak pernah dibalas.
+- **Nomor pembeli dari chat `@lid` dibaca dari `kontak.id`, bukan
+  `kontak.number`.** whatsapp-web.js v1.34 menerjemahkan LID ke JID nomor HP di
+  `kontak.id` (`getContactById`), sedangkan `kontak.number` selalu kosong dan
+  `client.getNumberId()` menambahkan `@c.us` ke argumennya sehingga LID
+  diperlakukan sebagai nomor HP dan selalu gagal. Salah baca di sini =
+  pesanan ditolak API dengan "Nomor WhatsApp tidak valid". Logika ada di
+  `nomorDariKontak()` (`core/wa-filter.js`, ada test regresinya).
+- **Identitas pembeli di grup = pengirim (`msg.author`)**, bukan ID grup;
+  balasan tetap dikirim ke chat asal (`msg.from`).
 - **Bukti transfer:** gambar apa pun atau teks berisi "bukti"/"transfer"/"sudah
   transfer" dianggap bukti; bot hanya mengonfirmasi, tidak memverifikasi.
   Periksa urutan di `route()`: bukti harus diproses SEBELUM pencarian, kalau

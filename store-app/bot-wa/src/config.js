@@ -86,6 +86,15 @@ export const config = {
         .map((n) => n.trim())
         .filter(Boolean),
 
+    /**
+     * ID grup (@g.us) yang boleh dilayani. Kosong = SEMUA grup diabaikan
+     * (default produksi). Isi hanya untuk grup uji coba milik sendiri.
+     */
+    groupAllowlist: (process.env.BOT_GROUP_ALLOWLIST || '')
+        .split(',')
+        .map((g) => g.trim())
+        .filter(Boolean),
+
     /** Log level: debug | info | warn | error */
     logLevel: process.env.BOT_LOG_LEVEL || 'info',
 

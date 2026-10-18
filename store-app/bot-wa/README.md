@@ -94,6 +94,7 @@ Tanpa token yang cocok, seluruh endpoint `/api/bot/*` menolak semua permintaan.
 | `BOT_ADMIN_NUMBERS` | nomor admin (62xxx), dipisah koma, untuk notifikasi pesanan baru |
 | `BOT_CHROME_PATH` | path Chrome; kosong = cari otomatis |
 | `BOT_ALLOWLIST` | kalau diisi, hanya nomor ini yang dilayani (uji produksi) |
+| `BOT_GROUP_ALLOWLIST` | ID grup (`@g.us`) yang boleh dilayani; kosong = semua grup diabaikan |
 | `BOT_RATE_LIMIT` | batas pesan per nomor per menit (default 20) |
 | `BOT_HEADLESS` | `false` untuk melihat jendela Chrome (debug) |
 | `BOT_WEB_VERSION` | pin versi WA Web, mis. `2.3000.1012355863` |
@@ -110,6 +111,22 @@ BOT_ALLOW_SELF=true
 Lalu kirim `list` dari chat dengan diri sendiri. Nonaktifkan lagi (`false`)
 setelah selesai — di produksi harus `false` supaya bot tidak membalas pesan
 sendiri.
+
+### Uji dari grup milik sendiri
+
+Kalau lebih nyaman memakai grup (mis. butuh HP kedua):
+
+```env
+BOT_GROUP_ALLOWLIST=120363429581560330@g.us
+```
+
+Bot hanya melayani grup yang didaftarkan. **Semua grup lain tetap diabaikan**,
+jadi grup pelanggan tidak akan pernah dibalas bot. Pesan dari diri sendiri di
+dalam grup tetap diabaikan, jadi balasan tidak berputar (loop).
+
+Identitas pembeli diambil dari pengirim grup, bukan ID grup — pesanan tetap
+memakai nomor WhatsApp pengirim yang sebenarnya.
+
 
 ## Uji tanpa WhatsApp
 
@@ -161,8 +178,9 @@ WantedBy=multi-user.target
 - **Chrome harus versi 146.** Chrome yang lebih baru (termasuk Flatpak)
   membuat `whatsapp-web.js` gagal inject dengan
   `Execution context was destroyed`. Pasang lewat `@puppeteer/browsers`.
-- **Bot mengabaikan grup, status, dan broadcast.** Tanpa filter ini bot akan
-  membalas setiap pesan siaran.
+- **Bot mengabaikan grup, status, dan broadcast.** Pengecualian hanya untuk
+  grup yang didaftarkan di `BOT_GROUP_ALLOWLIST` (grup uji coba sendiri).
+  Tanpa filter ini bot akan membalas setiap pesan siaran.
 - **Kredensial tidak pernah dikirim sebelum lunas.** Endpoint status
   memverifikasi nomor WhatsApp pembeli, dan hanya mengembalikan isi akun kalau
   pesanan sudah dibayar.

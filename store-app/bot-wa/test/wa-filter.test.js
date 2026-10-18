@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { alasanDiabaikan, chatIdDariNomor, harusDiabaikan, nomorDariChatId } from '../src/core/wa-filter.js';
+import { alasanDiabaikan, chatIdDariNomor, harusDiabaikan, nomorDariChatId, nomorDariKontak } from '../src/core/wa-filter.js';
 
 test('filter: chat pribadi dilayani', () => {
     assert.equal(harusDiabaikan({ from: '6282395124106@c.us' }), false);
@@ -23,6 +23,24 @@ test('filter: chat @lid (Linked Identity) DILAYANI', () => {
 
 test('filter: grup diabaikan', () => {
     assert.equal(harusDiabaikan({ from: '120363000000000000@g.us' }), true);
+});
+
+test('filter: grup hanya dilayani kalau masuk BOT_GROUP_ALLOWLIST', () => {
+    const grupUji = '120363429581560330@g.us';
+
+    // Default: semua grup ditolak (perilaku produksi).
+    assert.equal(harusDiabaikan({ from: grupUji }), true);
+    assert.equal(alasanDiabaikan({ from: grupUji }), 'chat grup');
+
+    // Grup yang didaftarkan eksplisit boleh dilayani.
+    assert.equal(harusDiabaikan({ from: grupUji }, false, [grupUji]), false);
+    assert.equal(alasanDiabaikan({ from: grupUji }, false, [grupUji]), '');
+
+    // Grup lain tetap ditolak walau allowlist terisi.
+    assert.equal(harusDiabaikan({ from: '120363999999999999@g.us' }, false, [grupUji]), true);
+
+    // Pesan sendiri di dalam grup uji tetap ditolak (mencegah loop balasan).
+    assert.equal(harusDiabaikan({ from: grupUji, fromMe: true }, false, [grupUji]), true);
 });
 
 test('filter: status diabaikan', () => {
@@ -74,4 +92,33 @@ test('chat id dari nomor', () => {
     assert.equal(chatIdDariNomor('6282395124106'), '6282395124106@c.us');
     assert.equal(chatIdDariNomor('+62 823-9512-4106'), '6282395124106@c.us');
     assert.equal(chatIdDariNomor(''), '');
+});
+
+test('nomor kontak: ambil dari JID hasil terjemahan LID', () => {
+    // Inilah bentuk nyata `getContactById('<lid>@lid')` pada whatsapp-web.js
+    // v1.34: `id` sudah berisi nomor HP, sementara `number` kosong. Kalau nomor
+    // tidak terbaca, bot mengirim LID ke API dan Laravel menolaknya dengan
+    // "Nomor WhatsApp tidak valid".
+    assert.equal(
+        nomorDariKontak({ id: { _serialized: '6289520594405@c.us', user: '6289520594405' }, number: undefined }),
+        '6289520594405',
+    );
+    assert.equal(nomorDariKontak({ id: { _serialized: '6282395124106@s.whatsapp.net' } }), '6282395124106');
+});
+
+test('nomor kontak: JID @lid TIDAK dipakai sebagai nomor', () => {
+    // 135691220558028 adalah LID, bukan nomor HP.
+    assert.equal(nomorDariKontak({ id: { _serialized: '135691220558028@lid' } }), null);
+});
+
+test('nomor kontak: 08xxx dinormalkan, properti `number` jadi cadangan', () => {
+    assert.equal(nomorDariKontak({ id: { _serialized: '62812345678@c.us' } }), '62812345678');
+    assert.equal(nomorDariKontak({ id: { _serialized: 'x@lid' }, number: '0812345678' }), '62812345678');
+    assert.equal(nomorDariKontak({ numberFormatted: '+62 812-3456-78' }), '62812345678');
+});
+
+test('nomor kontak: kosong kalau tidak ada yang valid', () => {
+    assert.equal(nomorDariKontak(null), null);
+    assert.equal(nomorDariKontak({}), null);
+    assert.equal(nomorDariKontak({ id: { _serialized: '120363429581560330@g.us' } }), null);
 });

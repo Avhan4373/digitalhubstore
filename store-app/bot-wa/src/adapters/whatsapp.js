@@ -19,7 +19,7 @@ import pkg from 'whatsapp-web.js';
 
 import { config } from '../config.js';
 import { log, maskNumber, nomorPenuh } from '../core/logger.js';
-import { alasanDiabaikan, harusDiabaikan, nomorDariChatId } from '../core/wa-filter.js';
+import { alasanDiabaikan, harusDiabaikan, adalahLid, nomorDariChatId, nomorDariKontak } from '../core/wa-filter.js';
 
 // whatsapp-web.js adalah CJS: named import gagal di proyek ESM.
 const { Client, LocalAuth, MessageMedia } = pkg;
@@ -145,68 +145,52 @@ export function sesiTersimpanAda(akar = config.sessionPath) {
  * Identitas pembeli dari sebuah pesan.
  *
  * WhatsApp kini sering mengirim chat dengan alamat `@lid` (Linked Identity),
- * yang bagian angkanya BUKAN nomor HP. Kita coba ubah ke JID berbasis nomor
- * HP supaya pesanan & pengiriman memakai nomor yang benar; kalau gagal, pakai
- * LID (tetap konsisten untuk pesanan yang dibuat & dicek bot).
+ * yang bagian angkanya BUKAN nomor HP. whatsapp-web.js sudah menerjemahkan LID
+ * itu ke JID nomor HP pada objek kontak (`kontak.id`), jadi di situlah nomor
+ * asli pembeli dibaca.
+ *
+ * Dua jebakan yang sengaja dihindari:
+ *   - `kontak.number` selalu kosong pada whatsapp-web.js v1.34.
+ *   - `client.getNumberId()` menambahkan `@c.us` ke argumennya, sehingga angka
+ *     LID diperlakukan sebagai nomor HP dan selalu gagal.
  *
  * @returns {Promise<{nomor: string, lid: string|null, sendTo: string}>}
  */
 async function identitasPembeli(msg, client) {
     const chatId = String(msg.from || '');
-    const dasar = nomorDariChatId(chatId);
+
+    // Di grup, `msg.from` adalah ID grup dan pengirim sebenarnya ada di
+    // `msg.author`. Identitas pembeli selalu diambil dari pengirim, sedangkan
+    // balasan tetap dikirim ke chat asal (`sendTo`).
+    const pengirim = String(msg.author || chatId);
+    const dasar = nomorDariChatId(pengirim);
 
     // Chat biasa (@c.us / @s.whatsapp.net): tidak ada yang perlu diubah.
-    if (!chatId.endsWith('@lid')) {
+    if (!adalahLid(pengirim)) {
         return { nomor: dasar, lid: null, sendTo: chatId };
     }
 
-    // ---------------------------------------------------------------- strategi 1
-    // getNumberId mengubah LID menjadi JID nomor HP. whatsapp-web.js kini
-    // memakai @s.whatsapp.net (bukan @c.us) untuk JID berbasis nomor.
     try {
-        const hasil = await client.getNumberId(dasar);
-        const jid = hasil?._serialized;
+        const kontak = await client.getContactById(pengirim);
+        const nomor = nomorDariKontak(kontak);
 
-        log.debug(`getNumberId(${dasar}) -> ${jid || '(kosong)'}`);
+        log.debug(`kontak ${pengirim} -> id=${kontak?.id?._serialized || kontak?.id || '(kosong)'}`);
 
-        if (jid && (jid.endsWith('@c.us') || jid.endsWith('@s.whatsapp.net'))) {
-            const nomor = nomorDariChatId(jid);
+        if (nomor) {
+            log.debug(`@lid ${maskNumber(dasar)} -> nomor HP ${maskNumber(nomor)}`);
 
-            if (nomorValid(nomor)) {
-                log.debug(`@lid ${maskNumber(dasar)} -> nomor HP ${maskNumber(nomor)}`);
-                return { nomor, lid: dasar, sendTo: jid };
-            }
-        }
-    } catch (e) {
-        log.debug(`getNumberId gagal: ${e.message}`);
-    }
-
-    // ---------------------------------------------------------------- strategi 2
-    // Data kontak bisa memuat nomor HP walau JID-nya @lid.
-    try {
-        const kontak = await client.getContactById(chatId);
-        const mentah = kontak?.number || kontak?.numberFormatted || '';
-        const nomor = String(mentah).replace(/\D/g, '');
-
-        log.debug(`kontak ${chatId} -> number=${mentah || '(kosong)'}`);
-
-        if (nomorValid(nomor)) {
-            return { nomor, lid: dasar, sendTo: `${nomor}@c.us` };
+            // Balasan tetap dikirim ke chat asal supaya masuk ke percakapan
+            // yang sama — bukan membuat chat baru.
+            return { nomor, lid: dasar, sendTo: chatId };
         }
     } catch (e) {
         log.debug(`getContactById gagal: ${e.message}`);
     }
 
-    // ---------------------------------------------------------------- strategi 3
-    // Tetap pakai LID. Bot bisa membuat & mengecek pesanan, tapi admin tidak
-    // bisa menghubungi pembeli lewat wa.me. Pembeli akan diminta nomor HP-nya.
+    // Nomor tetap tidak bisa dipastikan: pakai LID sebagai identitas sementara.
+    // Engine akan meminta nomor HP pembeli sekali sebelum pesanan dibuat.
     log.debug(`Chat @lid, pakai LID ${maskNumber(dasar)} sebagai identitas pembeli.`);
     return { nomor: dasar, lid: dasar, sendTo: chatId };
-}
-
-/** Nomor WhatsApp Indonesia yang masuk akal: 62 + 8..14 digit. */
-export function nomorValid(nomor) {
-    return /^62\d{8,14}$/.test(String(nomor || '').replace(/\D/g, ''));
 }
 
 export function buatAdapterWhatsApp(handler) {
@@ -351,10 +335,10 @@ export function buatAdapterWhatsApp(handler) {
     });
 
     client.on('message', async (msg) => {
-        const alasan = alasanDiabaikan(msg, config.allowSelf);
+        const alasan = alasanDiabaikan(msg, config.allowSelf, config.groupAllowlist);
 
         if (alasan !== '') {
-            log.debug(`Pesan diabaikan (${alasan}) dari ${maskNumber(nomorDariChatId(msg.from))}`);
+            log.debug(`Pesan diabaikan (${alasan}) dari ${maskNumber(nomorDariChatId(msg.author || msg.from))}`);
             return;
         }
 
@@ -364,10 +348,11 @@ export function buatAdapterWhatsApp(handler) {
         const teks = String(msg.body || '');
         const nama = String(msg._data?.notifyName || msg._data?.verifiedName || '').slice(0, 80);
         const hasMedia = Boolean(msg.hasMedia);
+        const dariGrup = String(chatId).includes('@g.us');
 
         // Satu pesan error tidak boleh mematikan proses bot.
         try {
-            log.info(`Pesan masuk dari ${maskNumber(nomor)}${lid ? ` (lid ${maskNumber(lid)})` : ''}${hasMedia ? ' [gambar]' : ''}: ${teks.slice(0, 60)}`);
+            log.info(`Pesan masuk dari ${maskNumber(nomor)}${lid ? ` (lid ${maskNumber(lid)})` : ''}${dariGrup ? ' [grup]' : ''}${hasMedia ? ' [gambar]' : ''}: ${teks.slice(0, 60)}`);
             await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia });
         } catch (e) {
             log.error(`Handler pesan gagal: ${e.message}`);
