@@ -21,8 +21,19 @@ import { pecahPesan } from './core/format.js';
 import { log, maskNumber } from './core/logger.js';
 import { sweepSessions } from './core/session.js';
 import * as R from './core/replies.js';
+import { patchWhatsappWeb } from './patch-lib.js';
 
 assertConfig();
+
+// Kiriman media (QRIS!) rusak di whatsapp-web.js v1.34.7 tanpa patch ini.
+// Dipanggil sebelum client dibuat; idempoten dan aman diulang tiap start.
+const statusPatch = patchWhatsappWeb();
+
+if (statusPatch === 'dipasang') {
+    log.info('Patch pengiriman media whatsapp-web.js dipasang (bug #201921).');
+} else if (statusPatch !== 'sudah-ada') {
+    log.warn(`Patch media whatsapp-web.js TIDAK terpasang (${statusPatch}) — kiriman gambar bisa gagal.`);
+}
 
 let adapter = null;
 
@@ -46,19 +57,22 @@ function catatPesanan(chatId, invoice) {
  * di grup terlihat jelas pertanyaan mana yang diberi jawaban.
  */
 async function kirimHasil(chatId, hasil, balasId = null) {
-    // Gambar+teks jadi SATU pesan (perintah `pay`): caption gambar langsung
-    // berisi info pembayarannya, jadi tidak ada pesan teks terpisah.
-    if (hasil.qris && hasil.qrisDulu) {
-        await adapter.kirimMedia(chatId, hasil.qris, hasil.qrisCaption || '💳 QRIS RESMI');
-    }
+    let pesanPertama = true;
 
-    let potonganPertama = true;
+    // Gambar+teks jadi SATU pesan (perintah `pay`): caption gambar langsung
+    // berisi info pembayarannya, dan pesan ini juga meng-quote pesan pembeli.
+    if (hasil.qris && hasil.qrisDulu) {
+        await adapter.kirimMedia(chatId, hasil.qris, hasil.qrisCaption || '💳 QRIS RESMI', {
+            balasId: pesanPertama ? balasId : null,
+        });
+        pesanPertama = false;
+    }
 
     for (const teks of hasil.replies || []) {
         for (const potongan of pecahPesan(teks)) {
-            const opsi = potonganPertama && balasId ? { balasId } : {};
+            const opsi = pesanPertama && balasId ? { balasId } : {};
             await adapter.kirim(chatId, potongan, opsi);
-            potonganPertama = false;
+            pesanPertama = false;
         }
     }
 

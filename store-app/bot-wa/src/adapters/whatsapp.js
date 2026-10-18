@@ -332,43 +332,66 @@ export function buatAdapterWhatsApp(handler) {
      * `ignoreQuoteErrors` default true). Karena itu percobaan quote selalu ke
      * chat asal dulu; kalau gagal/tidak terkirim, kirim biasa ke tujuan.
      */
-    async function kirimTeks(chatId, teks, opsi = {}) {
-        const tujuan = sendToPerChat.get(chatId) || chatId;
+    /** Catat hasil kirim + status quote (field `quotedMsg` model pesan). */
+    function logKirim(label, chatId, pesan, dicobaQuote) {
+        const menempel = Boolean(pesan?.hasQuotedMsg ?? pesan?._data?.quotedMsg);
+        const status = dicobaQuote ? ` | quote=${menempel ? 'menempel' : 'TIDAK menempel'}` : '';
 
-        log.debug(`kirimTeks chat=${maskNumber(nomorDariChatId(chatId))} tujuan=${maskNumber(nomorDariChatId(tujuan))} balasId=${opsi.balasId ? 'ada' : '-'}`);
+        log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${label})${status}`);
+    }
 
-        // Diagnostik: apakah ID pesan yang mau diquote benar-benar ada di store
-        // WhatsApp dan boleh dibalas? (kalau tidak, library membuang quote
-        // diam-diam karena ignoreQuoteErrors default true)
-        if (opsi.balasId) {
-            const cek = await client.pupPage
-                .evaluate((id) => {
+    /**
+     * Diagnostik quote (level debug): apakah ID pesan ada di store WhatsApp,
+     * boleh dibalas, dan apa saja isi `msgContextInfo()`-nya.
+     */
+    async function cekQuote(pesanId, chatQuote) {
+        const hasil = await client.pupPage
+            .evaluate(async (id, chatId) => {
+                try {
+                    const Msg = window.require('WAWebCollections').Msg;
+                    const pesan = Msg.get(id);
+
+                    if (!pesan) return 'tidak-ada-di-store';
+
+                    const Reply = window.require('WAWebMsgReply');
+                    const boleh = Reply ? Reply.canReplyMsg(pesan.unsafe()) : pesan.canReply();
+
+                    let kunci = '';
                     try {
-                        const Msg = window.require('WAWebCollections').Msg;
-                        const pesan = Msg.get(id);
-
-                        if (!pesan) return 'tidak-ada-di-store';
-
-                        const Reply = window.require('WAWebMsgReply');
-
-                        return `ada|canReply=${Reply ? Reply.canReplyMsg(pesan.unsafe()) : pesan.canReply()}`;
+                        const chat = await window.WWebJS.getChat(chatId, { getAsModel: false });
+                        kunci = Object.keys(pesan.msgContextInfo(chat)).join(',') || '(kosong)';
                     } catch (e) {
-                        return `error=${e.message}`;
+                        kunci = `gagal=${e.message}`;
                     }
-                }, opsi.balasId)
-                .catch((e) => `tidak-bisa-cek=${e.message}`);
 
-            log.debug(`cek-quote ${opsi.balasId} -> ${cek}`);
-        }
+                    return `ada|canReply=${boleh}|ctx=${kunci}`;
+                } catch (e) {
+                    return `error=${e.message}`;
+                }
+            }, pesanId, chatQuote)
+            .catch((e) => `tidak-bisa-cek=${e.message}`);
 
-        if (opsi.balasId && tujuan !== chatId) {
+        log.debug(`cek-quote ${pesanId} -> ${hasil}`);
+    }
+
+    /**
+     * Kirim SATU pesan dengan quote yang tidak pernah memotong balasan.
+     *
+     * `buat(tujuan, opsi)` membangun panggilan `client.sendMessage`. Urutannya:
+     *   1. kalau tujuan kirim berbeda dari chat asal (kasus DM `@lid`), quote
+     *      dicoba dulu KE CHAT ASAL — ID pesan hanya dikenal di chat itu;
+     *   2. kalau gagal, kirim biasa tanpa quote (dengan 3x ulang untuk error
+     *      konteks WA yang hilang, mis. saat WhatsApp Web reload).
+     *
+     * @returns {Promise<boolean>} true kalau pesan terkirim
+     */
+    async function kirimKe(chatId, tujuan, buat, label, balasId) {
+        if (balasId && tujuan !== chatId) {
             try {
-                const berbalas = await client.sendMessage(chatId, teks, {
-                    quotedMessageId: opsi.balasId,
-                });
+                const berbalas = await buat(chatId, { quotedMessageId: balasId });
 
                 if (berbalas) {
-                    log.debug(`Terkirim (quote) ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter) | quote=${berbalas._data?.quotedStanzaId ? 'menempel' : 'TIDAK menempel'}`);
+                    logKirim(label, chatId, berbalas, true);
                     return true;
                 }
 
@@ -379,12 +402,13 @@ export function buatAdapterWhatsApp(handler) {
         }
 
         for (let i = 0; i < 3; i += 1) {
+            const opsiQuote = i === 0 && balasId && tujuan === chatId
+                ? { quotedMessageId: balasId }
+                : undefined;
+
             try {
-                const kirimOpsi = i === 0 && opsi.balasId && tujuan === chatId
-                    ? { quotedMessageId: opsi.balasId }
-                    : undefined;
-                const terkirim = await client.sendMessage(tujuan, teks, kirimOpsi);
-                log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)${kirimOpsi ? ` | quote=${terkirim?._data?.quotedStanzaId ? 'menempel' : 'TIDAK menempel'}` : ''}`);
+                const terkirim = await buat(tujuan, opsiQuote);
+                logKirim(label, chatId, terkirim, Boolean(opsiQuote));
                 return true;
             } catch (e) {
                 const sementara = /Execution context was destroyed|detached Frame|Target closed/i.test(e.message || '');
@@ -399,16 +423,56 @@ export function buatAdapterWhatsApp(handler) {
         return false;
     }
 
-    /** Kirim gambar; kalau gagal, kirim teks pengganti supaya pembeli tetap tahu. */
-    async function kirimGambar(chatId, sumber, caption) {
+    async function kirimTeks(chatId, teks, opsi = {}) {
+        const tujuan = sendToPerChat.get(chatId) || chatId;
+
+        log.debug(`kirimTeks chat=${maskNumber(nomorDariChatId(chatId))} tujuan=${maskNumber(nomorDariChatId(tujuan))} balasId=${opsi.balasId ? 'ada' : '-'}`);
+
+        if (opsi.balasId) await cekQuote(opsi.balasId, chatId);
+
+        return kirimKe(
+            chatId,
+            tujuan,
+            (kirimKeTujuan, opsiKirim) => client.sendMessage(kirimKeTujuan, teks, opsiKirim),
+            `${teks.length} karakter`,
+            opsi.balasId,
+        );
+    }
+
+    /**
+     * Kirim gambar (berkas lokal atau URL) dengan caption. Bisa ikut meng-quote
+     * pesan pembeli seperti pesan teks; kalau gambarnya gagal, caption dikirim
+     * sebagai teks supaya pembeli tetap tahu.
+     */
+    async function kirimGambar(chatId, sumber, caption, opsi = {}) {
+        const tujuan = sendToPerChat.get(chatId) || chatId;
+
+        log.debug(`kirimGambar chat=${maskNumber(nomorDariChatId(chatId))} tujuan=${maskNumber(nomorDariChatId(tujuan))} balasId=${opsi.balasId ? 'ada' : '-'}`);
+
+        let media;
         try {
-            const media = await mediaDari(sumber);
-            await client.sendMessage(chatId, media, { caption });
-            return true;
+            media = await mediaDari(sumber);
+        } catch (e) {
+            log.warn(`Gambar gagal dibaca (${e.message}); fallback teks.`);
+            return kirimTeks(chatId, caption, opsi);
+        }
+
+        if (opsi.balasId) await cekQuote(opsi.balasId, chatId);
+
+        try {
+            return await kirimKe(
+                chatId,
+                tujuan,
+                (tujuanKirim, opsiKirim) => client.sendMessage(tujuanKirim, media, {
+                    caption,
+                    ...(opsiKirim || {}),
+                }),
+                `gambar ${path.basename(String(sumber))}`,
+                opsi.balasId,
+            );
         } catch (e) {
             log.warn(`Gambar gagal dikirim (${e.message}); fallback teks.`);
-            await kirimTeks(chatId, caption);
-            return false;
+            return kirimTeks(chatId, caption, opsi);
         }
     }
 
@@ -497,10 +561,8 @@ export function buatAdapterWhatsApp(handler) {
             return antre(chatId, () => kirimTeks(chatId, teks, opsi));
         },
 
-        async kirimMedia(chatId, url, caption) {
-            const tujuan = sendToPerChat.get(chatId) || chatId;
-
-            return antre(chatId, () => kirimGambar(tujuan, url, caption));
+        async kirimMedia(chatId, sumber, caption, opsi = {}) {
+            return antre(chatId, () => kirimGambar(chatId, sumber, caption, opsi));
         },
 
         async berhenti() {

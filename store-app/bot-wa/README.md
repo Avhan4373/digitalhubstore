@@ -209,6 +209,24 @@ WantedBy=multi-user.target
   pesanan sudah dibayar.
 - **Sesi LocalAuth berisi kunci akun WhatsApp.** Jangan commit `.wwebjs_auth/`
   (sudah ada di `.gitignore`).
+- **Kiriman media butuh patch `whatsapp-web.js`.** Di v1.34.7 (versi terakhir di
+  npm) `sendMessage()` untuk gambar/video/audio gagal dengan
+  `Data passed to getter must include an id property (it's how we memoize)`
+  karena properti internal `MediaData.__x_id` menimpa ID pesan keluar
+  (isu upstream #201921/#201922, diperbaiki di PR #201923). `src/patch-lib.js`
+  menambahkan `delete message.__x_id;` ke berkas injeksi library dan dijalankan
+  otomatis setiap bot start (idempoten, jadi `npm install` yang menimpa
+  `node_modules` tidak masalah). Gejalanya tanpa patch: QRIS gagal terkirim dan
+  hanya teks penggantinya yang sampai ke pembeli.
+- **Uji kirim media tanpa pembeli:** hentikan bot, lalu
+  `node uji-media.mjs 628xxxxxxxxxx@c.us "caption uji"`. Skrip ini login dengan
+  sesi yang sama, mengirim `qris.jpeg` ke chat tujuan, lalu keluar — berguna
+  untuk memastikan gambar benar-benar sampai setelah upgrade/patch.
+- **ID pesan untuk quote/reply.** Di v1.34.7 `msg.id` tidak punya
+  `_serialized`; kunci store aslinya ada di `msg.id.$1`
+  (`false_<chat>_<id>` dan menyertakan `participant` di grup) dan itulah yang
+  dipakai bot. Untuk DM `@lid`, quote dikirim ke chat asal karena ID pesan
+  hanya dikenal di chat itu.
 
 ## Sesi WhatsApp (scan QR sekali saja)
 
