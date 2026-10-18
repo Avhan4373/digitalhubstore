@@ -184,9 +184,15 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   balasan tetap dikirim ke chat asal (`msg.from`).
 - **Bukti transfer TIDAK dibalas bot.** Gambar apa pun atau teks berisi
   "bukti"/"transfer"/"tf"/"sudah transfer" dikenali sebagai bukti dan bot
-  mengembalikan `{ replies: [], bukti: true }` — diam total, termasuk kalau
-  pesanannya tidak ditemukan (dulu bot menjawab "saya tidak menemukan pesanan
-  yang menunggu pembayaran…", itu hanya menambah bising). Yang dikabari justru
+  mengembalikan `{ replies: [], bukti: true }` — diam total untuk pembeli yang
+  **punya pesanan**. Validasi "sudah order atau belum" WAJIB lewat server
+  (`punyaPesananAktif()` → `api.orderHistory`), **bukan** state percakapan:
+  `buatPesanan()` memanggil `clearState()`, jadi pembeli yang sudah order justru
+  tidak punya state, sementara membuka detail produk sudah membuat state tanpa
+  pesanan. Nomor yang belum pernah order ditolak dengan `R.buktiTidakValid()`
+  (`buktiDitolak: true`, admin TIDAK dikabari) supaya admin tidak dibanjiri
+  notifikasi palsu. Nomor yang belum bisa divalidasi (LID/API gagal) tetap
+  diteruskan ke admin. Yang dikabari justru
   ADMIN: `beritahuBukti()` di `src/index.js` mengirim DM ke setiap
   `BOT_ADMIN_NUMBERS` (nama, nomor pengirim apa adanya, grup/DM, pesanan terakhir
   bila ada, ajakan balas `proses`/`done`) **beserta gambarnya**: adapter

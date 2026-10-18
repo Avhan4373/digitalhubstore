@@ -208,6 +208,14 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
                 transaksi: transaksiTerakhir.get(chatId) || null,
                 gambar: buktiGambar,
             });
+        } else if (hasil.buktiDitolak) {
+            // Penting untuk diagnosis: tanpa log ini, bukti yang ditolak tidak
+            // meninggalkan jejak apa pun (bot hanya membalas pembeli).
+            log.warn(
+                `Bukti transfer dari ${maskNumber(nomor)} (${buktiGambar ? 'bergambar' : 'teks'}) `
+                + '— DITOLAK: nomor ini belum punya pesanan di server. '
+                + 'Pembeli diberi arahan memilih produk; admin tidak dikabari.',
+            );
         }
 
         // Kirim ke CHAT ASAL (adapter yang menyelesaikan tujuan per chat) dan

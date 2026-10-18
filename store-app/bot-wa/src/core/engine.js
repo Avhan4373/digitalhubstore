@@ -192,52 +192,46 @@ function isBukti(ctx, aksi) {
 }
 
 /**
- * Apakah nomor ini punya pesanan yang sedang dibayar (pending / belum lunas)?
+ * Apakah nomor ini punya pesanan nyata di server?
  *
- * Dipakai validasi bukti transfer: hanya pembeli yang memang punya order
- * pending boleh mengirim bukti — supaya user lain (user2) yang belum order
- * tidak memicu notifikasi palsu ke admin.
+ * Ini satu-satunya sumber kebenaran untuk "sudah order atau belum". State
+ * percakapan TIDAK bisa dipakai: `buatPesanan()` memanggil `clearState()`
+ * begitu pesanan dibuat, jadi pembeli yang sudah order justru tidak punya
+ * state — sementara pembeli yang baru membuka detail produk punya state
+ * tanpa pesanan sama sekali.
  *
- * - `true`  : ada order pending -> bukti diterima, bot diam.
- * - `false` : tidak ada order pending -> bukti ditolak, bot memberi tahu pembeli.
- * - `null`  : belum bisa validasi (nomor LID belum jadi nomor HP, atau API gagal)
- *            -> tetap perlakukan sebagai bukti (bot diam, admin cek manual).
+ * - `true`  : ada pesanan yang masih berlaku (termasuk yang sudah lunas,
+ *             supaya pembeli yang mengirim bukti ulang tidak ditolak).
+ * - `false` : tidak ada pesanan sama sekali / semuanya batal-kedaluwarsa.
+ * - `null`  : belum bisa validasi (nomor LID belum jadi nomor HP, atau API
+ *             gagal) -> pemanggil memutuskan sendiri, jangan memblokir.
  */
-async function buktiValid(nomor) {
+async function punyaPesananAktif(nomor) {
     if (!nomor || !nomorValid(nomor)) return null;
 
     try {
         const { orders } = await api.orderHistory(nomor);
 
         return (orders || []).some(
-            (o) =>
-                !o.is_paid &&
-                o.can_pay !== false &&
-                !['cancelled', 'failed', 'expired'].includes(o.order_status),
+            (o) => !['cancelled', 'failed', 'expired'].includes(o.order_status),
         );
     } catch {
-        // API gagal: jangan false (bisa menolak pembeli yang akan bayar),
-        // dan jangan true (bisa menerima notifikasi palsu). null = biarkan
-        // bot diam dan admin yang cek manual.
         return null;
     }
 }
 
 /**
  * Jawaban untuk sebuah bukti transfer (gambar atau teks kata kunci).
- * Bot tidak membalas pembeli yang punya order pending (`bukti: true`), tapi
- * menolak balasan ke DM bila tidak ada order pending — agar tidak membanjiri
- * admin notifikasi palsu.
+ * Bot tidak membalas pembeli yang punya pesanan (`bukti: true`), tapi menolak
+ * bila nomor itu belum pernah order — agar tidak membanjiri admin dengan
+ * notifikasi palsu. Kalau validasi tidak mungkin dilakukan, bukti tetap
+ * diteruskan (admin yang menilai).
  */
 async function buktiAtauTolak(nomor) {
-    const valid = await buktiValid(nomor);
-
-    if (valid === null) {
-        return { replies: [], bukti: true };
-    }
+    const valid = await punyaPesananAktif(nomor);
 
     if (valid === false) {
-        return { replies: [R.buktiTidakValid()] };
+        return { replies: [R.buktiTidakValid()], buktiDitolak: true };
     }
 
     return { replies: [], bukti: true };
@@ -435,10 +429,19 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Dikirim sebagai SATU pesan: gambar QRIS dengan teksnya sebagai caption,
     // supaya kalimat "QRIS diatas" menunjuk ke gambar di pesan itu sendiri.
     if (aksi.type === 'pay') {
-        // Validasi: `pay` hanya berlaku saat sudah dalam alur order (produk
-        // sudah dipilih). Kalau belum ada state, arahkan ke katalog supaya
-        // tidak kirim QRIS tanpa konteks pesanan.
-        if (!state?.tahap) {
+        // Validasi: `pay` hanya untuk pembeli yang benar-benar sudah membuat
+        // pesanan. State percakapan tidak bisa dipakai sebagai bukti (lihat
+        // `punyaPesananAktif()`), jadi tanyakan ke server.
+        //
+        // `null` = nomor belum bisa dipetakan ke nomor HP / API gagal. Dalam
+        // kasus itu bot tidak memblokir: info pembayaran resmi memang publik
+        // dan aman dibagikan.
+        //
+        // Admin dikecualikan: mereka memang tidak pernah membuat pesanan,
+        // tapi butuh QRIS/nomor resmi untuk verifikasi manual.
+        const sudahOrder = ctx.admin ? true : await punyaPesananAktif(nomor);
+
+        if (sudahOrder === false) {
             return { replies: [R.mintaPilihProdukDulu()] };
         }
 

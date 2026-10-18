@@ -368,11 +368,16 @@ test('pembeli (bukan admin) mengetik proses tidak dapat pengumuman transaksi', a
 
 // ------------------------------------------------------------- info pembayaran
 
-test('pay setelah pilih produk: kirim QRIS resmi (gambar + caption satu pesan)', async () => {
-    await kirim('list');
-    await kirim('1');
+test('pay setelah punya pesanan: kirim QRIS resmi (gambar + caption satu pesan)', async () => {
+    // Pembeli nyata (bukan admin) yang sudah punya pesanan di server.
+    engine.resetRateLimit('628111000113');
 
-    const hasil = await kirim('pay');
+    const hasil = await engine.handlePesan({
+        teks: 'pay',
+        nomor: '628111000113',
+        chatId: 'dm-pay3',
+        nama: 'Pembeli',
+    });
     const teks = hasil.qrisCaption || '';
 
     // Teks info pembayaran jadi caption gambar, bukan pesan terpisah.
@@ -400,11 +405,49 @@ test('pay tanpa gambar QRIS tetap mengirim teks + peringatan', async () => {
 });
 
 
-test("pay sebelum pilih produk -> arahkan pilih dulu", async () => {
-    const hasil = await kirim("pay");
+test("pay dari nomor tanpa pesanan -> arahkan pilih dulu", async () => {
+    stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
+    engine.resetRateLimit("628111000111");
+
+    // Nomor pembeli biasa (bukan admin) supaya validasi benar-benar diuji.
+    const hasil = await engine.handlePesan({
+        teks: "pay",
+        nomor: "628111000111",
+        chatId: "dm-pay",
+        nama: "Pembeli",
+    });
+
     assert.equal(hasil.qris, undefined);
     assert.equal(hasil.qrisDulu, undefined);
-    assert.match(hasil.replies[0], /Belum ada produk yang dipilih/);
+    assert.match(hasil.replies[0], /Belum ada pesanan di nomor ini/);
+});
+
+// `pay` TIDAK boleh memakai state percakapan sebagai bukti "sudah order":
+// membuka detail produk juga membuat state, padahal pesanan belum ada.
+test("pay saat baru buka detail produk tetap ditolak", async () => {
+    stubFetch((path) => {
+        if (path === '/api/bot/katalog') return KATALOG;
+        if (path === '/api/bot/produk/wetv') return { ...DETAIL, product: { ...DETAIL.product, slug: 'wetv', name: 'WeTV' } };
+        if (path === '/api/bot/pesanan/riwayat') return { orders: [] };
+        return null;
+    });
+    engine.resetRateLimit("628111000112");
+
+    await engine.handlePesan({ teks: 'wetv', nomor: '628111000112', chatId: 'dm-pay2', nama: 'Pembeli' });
+    const hasil = await engine.handlePesan({ teks: 'pay', nomor: '628111000112', chatId: 'dm-pay2', nama: 'Pembeli' });
+
+    assert.equal(hasil.qris, undefined, 'QRIS tidak boleh dikirim sebelum ada pesanan');
+    assert.match(hasil.replies[0], /Belum ada pesanan di nomor ini/);
+});
+
+// Admin tidak pernah membuat pesanan tapi tetap butuh QRIS/nomor resmi.
+test("pay dari admin tetap mengirim QRIS resmi", async () => {
+    stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
+
+    const hasil = await kirim("pay");
+
+    assert.ok(hasil.qris, "admin tetap dapat QRIS");
+    assert.equal(hasil.qrisDulu, true);
 });
 
 test('pencarian banyak hasil menampilkan pilihan', async () => {
@@ -472,7 +515,7 @@ test('notifikasi bukti ke admin: chat pribadi tanpa pesanan dikenali', () => {
     assert.doesNotMatch(teks, /🧾/);
 });
 
-test("bukti dari nomor tanpa order pending -> ditolak, tidak ke admin", async () => {
+test("bukti dari nomor tanpa pesanan -> ditolak, tidak ke admin", async () => {
     stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
     engine.resetRateLimit("628999888777");
 
@@ -484,8 +527,22 @@ test("bukti dari nomor tanpa order pending -> ditolak, tidak ke admin", async ()
     });
 
     assert.equal(hasil.bukti, undefined, "bukan notifikasi ke admin");
-    assert.match(hasil.replies[0], /pesanan yang sedang dibayar/);
+    assert.equal(hasil.buktiDitolak, true);
+    assert.match(hasil.replies[0], /tidak menemukan pesanan di nomor ini/);
     assert.ok(panggilan.some((p) => p.path === "/api/bot/pesanan/riwayat"));
+});
+
+// Pembeli yang SUDAH lunas lalu mengirim bukti ulang tetap diteruskan ke admin
+// (bukan ditolak) — dulu syaratnya `!is_paid` sehingga kasus ini salah tolak.
+test("bukti dari nomor dengan pesanan lunas tetap diteruskan ke admin", async () => {
+    stubFetch((path) => (path === "/api/bot/pesanan/riwayat"
+        ? { orders: [{ ...PESANAN, is_paid: true, payment_status: 'paid', can_pay: false }] }
+        : null));
+
+    const hasil = await kirim("sudah transfer");
+
+    assert.equal(hasil.bukti, true);
+    assert.deepEqual(hasil.replies, []);
 });
 
 // Regression: notifikasi TRANSAKSI PENDING/DONE cukup sampai catatan, tidak

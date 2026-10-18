@@ -39,8 +39,10 @@ tampilan WhatsApp. Balasan pertama bot dikirim sebagai **reply/quote** ke pesan
 pembeli (terutama terlihat di grup), sisanya pesan biasa.
 
 **Bukti transfer tidak dibalas bot.** Gambar (atau teks "sudah transfer", "bukti",
-"tf") hanya dicatat di log — tidak ada balasan apa pun ke pembeli, termasuk kalau
-pesanannya tidak ditemukan. Sebagai gantinya, bot mengirim **notifikasi ke chat
+"tf") tidak dibalas — **kecuali** kalau nomor pengirim belum pernah membuat
+pesanan sama sekali: bukti seperti itu ditolak dengan arahan memilih produk dulu,
+dan admin tidak dikabari (mencegah notifikasi palsu dari orang yang belum order).
+Sebagai gantinya, untuk bukti yang sah, bot mengirim **notifikasi ke chat
 pribadi tiap nomor di `BOT_ADMIN_NUMBERS`**. Kalau pembeli mengirim **gambar**,
 gambarnya ikut diteruskan dan keterangan di bawah jadi caption-nya (satu pesan):
 
@@ -79,8 +81,8 @@ ditanyakan sebelum pesanan dibuat.
 |---|---|
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog gaya papan menu + tanggal/jam WIB |
 | nama produk (`canva`, `netflix`) | cari produk |
-| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS) |
-| gambar / "sudah transfer" / "bukti" | **tidak dibalas** — admin mengecek manual lalu mengabari lewat `proses`/`done` |
+| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS). **Hanya untuk nomor yang sudah punya pesanan** (dan admin) — nomor lain diarahkan `list` dulu |
+| gambar / "sudah transfer" / "bukti" | **tidak dibalas** bila nomor punya pesanan — admin mengecek manual lalu mengabari lewat `proses`/`done`. Nomor yang belum pernah order ditolak dengan arahan `list` |
 | `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
 | `bantuan` / `cs` | panduan + tautan admin |
@@ -133,7 +135,7 @@ Pesan hanya berisi ringkasan ini — cukup sampai catatan, tidak ada kalimat pen
 
 - Catatan boleh ditulis sendiri: `proses LANDING PAGE 1 TAHUN`. Kalau tidak
   ditulis, dipakai nama produk + paket dari **pesanan terakhir** yang dibuat bot
-  di chat itu; kalau belum ada pesanan di chat itu, bot meminta catatannya.
+  di chat itu; kalau belum ada pesanan di chat itu, bot tetap kirim TRANSAKSI PENDING (field catatan kosong biarkan admin isi di panel).
 - Karena bukti transfer **tidak** dibalas bot, pengumuman `proses`/`done` inilah
   kabar pertama yang diterima pembeli — kirim `proses` setelah pembayaran dicek.
 - **Hanya nomor admin.** Pembeli yang mengetik `proses`/`done` tidak dilayani —
@@ -221,7 +223,7 @@ memakai nomor WhatsApp pengirim yang sebenarnya.
 Seluruh alur bisa diuji tanpa Chrome dan tanpa scan QR:
 
 ```bash
-npm test          # 52 test: parser, format, filter WA, katalog, alur percakapan
+npm test          # 97 test: parser, format, filter WA, katalog, alur percakapan
 npm run simulate  # coba percakapan langsung di terminal
 npm run cek       # periksa token + katalog ke Laravel (tanpa kirim pesan)
 ```
