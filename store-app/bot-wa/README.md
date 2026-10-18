@@ -187,6 +187,7 @@ Tanpa token yang cocok, seluruh endpoint `/api/bot/*` menolak semua permintaan.
 | `BOT_GROUP_ALLOWLIST` | ID grup (`@g.us`) yang boleh dilayani; kosong = semua grup diabaikan |
 | `BOT_RATE_LIMIT` | batas pesan per nomor per menit (default 20) |
 | `BOT_HEADLESS` | `false` untuk melihat jendela Chrome (debug) |
+| `BOT_PROTOCOL_TIMEOUT` | batas waktu CDP Chrome dalam ms (default 420000). Naikkan kalau sering muncul `Runtime.callFunctionOn timed out` di mesin sibuk |
 | `BOT_WEB_VERSION` | pin versi WA Web, mis. `2.3000.1012355863` |
 | `BOT_LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` |
 

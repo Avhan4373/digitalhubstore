@@ -100,6 +100,16 @@ export const config = {
     /** Tampilkan QR di terminal. */
     headless: process.env.BOT_HEADLESS !== 'false',
 
+    /**
+     * Batas waktu protokol CDP untuk operasi Chrome (ms).
+     *
+     * Default puppeteer 180 detik. Kalau mesin sedang sibuk (load tinggi,
+     * RAM tipis, Chrome pertama kali membuka profil sesi), inject WhatsApp
+     * Web bisa melewati batas itu dan bot mati dengan
+     * `Runtime.callFunctionOn timed out` padahal Chrome-nya sehat.
+     */
+    protocolTimeout: Number(process.env.BOT_PROTOCOL_TIMEOUT || 420_000),
+
     /** Batas pesan masuk per nomor per menit (mirror pengaturan Laravel). */
     rateLimitPerMinute: Number(process.env.BOT_RATE_LIMIT || 20),
 

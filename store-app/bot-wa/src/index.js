@@ -291,20 +291,69 @@ function mulaiAdapter() {
 
         onReady() {
             log.info(`Bot aktif. Admin: ${config.adminNumbers.map(maskNumber).join(', ') || '(belum diisi)'}`);
+
+            // Koneksi berhasil: reset hitungan percobaan ulang supaya kegagalan
+            // berikutnya (berjam-jam kemudian) tetap dicoba dari jeda terpendek.
+            percobaanUlang = 0;
+
             // Mulai memantau pesanan setelah koneksi siap.
             setInterval(pollSelesai, 60_000).unref();
         },
 
         onDisconnected(alasan) {
-            log.error(`Bot berhenti: ${alasan}. Restart dalam 5 detik…`);
-            setTimeout(() => process.exit(1), 5000);
+            log.error(`Bot berhenti: ${alasan}`);
+            prosesUlang(alasan);
         },
     });
 
     adapter.mulai().catch((e) => {
         log.error(`Gagal memulai WhatsApp: ${e.message}`);
-        process.exit(1);
+        prosesUlang(e);
     });
+}
+
+/**
+ * Coba lagi setelah gagal start / terputus.
+ *
+ * Kegagalan inject Chrome (`Runtime.callFunctionOn timed out`) biasanya
+ * sementara: mesin sedang sibuk, atau sisa proses Chrome dari percobaan
+ * sebelumnya masih memegang profil sesi. Sebelumnya bot langsung
+ * `process.exit(1)` sehingga harus dinyalakan manual — di produksi itu berarti
+ * bot mati diam-diam sampai ada yang sadar.
+ */
+let percobaanUlang = 0;
+let sedangMengulang = false;
+
+function prosesUlang(sebab) {
+    if (sedangMengulang) return;
+    sedangMengulang = true;
+
+    percobaanUlang += 1;
+
+    // Jeda bertingkat: 15 detik, lalu 30, 60, dan maksimal 120 detik.
+    const jeda = Math.min(15_000 * percobaanUlang, 120_000);
+
+    log.warn(
+        `Mencoba menyalakan ulang bot dalam ${Math.round(jeda / 1000)} detik `
+        + `(percobaan ke-${percobaanUlang}). Penyebab: ${sebab}`,
+    );
+
+    setTimeout(async () => {
+        sedangMengulang = false;
+
+        try {
+            if (adapter) await adapter.berhenti().catch(() => {});
+        } catch {
+            // Abaikan: tujuannya hanya melepas Chrome sebelum start ulang.
+        }
+
+        try {
+            mulaiAdapter();
+        } catch (e) {
+            log.error(`Gagal menyalakan ulang bot: ${e.message}`);
+            prosesUlang(e.message);
+        }
+    }, jeda).unref();
 }
 
 // Bersihkan sesi percakapan kedaluwarsa tiap 10 menit.

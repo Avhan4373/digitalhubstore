@@ -384,6 +384,11 @@ export function buatAdapterWhatsApp(handler) {
             headless: config.headless,
             executablePath: chrome,
             args: argumenChrome(),
+            // Default puppeteer hanya 180 detik. Di mesin yang sedang sibuk
+            // (load tinggi / RAM tipis) inject WhatsApp Web bisa melewati itu
+            // dan berakhir `Runtime.callFunctionOn timed out` — bot lalu mati
+            // padahal Chrome-nya sehat. Beri ruang jauh lebih longgar.
+            protocolTimeout: config.protocolTimeout,
         },
     };
 
