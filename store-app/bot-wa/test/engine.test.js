@@ -14,7 +14,14 @@ process.env.BOT_API_TOKEN = 'token-uji';
 process.env.BOT_API_URL = 'http://toko.test';
 
 const KATALOG = {
-    store: { name: 'Creative Solutions', whatsapp: '6282395124106', tagline: 'Akun premium resmi' },
+    store: {
+        name: 'Creative Solutions',
+        whatsapp: '6282395124106',
+        tagline: 'Akun premium resmi',
+        owner_numbers: ['6282243890517', '628214369690'],
+        qris_url: 'https://toko.test/qris-resmi.jpg',
+        qris_holder: 'Creative Solutions',
+    },
     categories: [
         {
             id: 1,
@@ -277,6 +284,22 @@ test('list bisa dipakai lagi dari layar pilih paket', async () => {
 test('pencarian satu hasil langsung membuka detail', async () => {
     const { replies } = await kirim('netflix');
     assert.match(replies[0], /^\*NETFLIX\*$/m);
+});
+
+// ------------------------------------------------------------- info pembayaran
+
+test('pay menampilkan nomor owner resmi + QRIS resmi', async () => {
+    const hasil = await kirim('pay');
+    const teks = hasil.replies[0];
+
+    assert.match(teks, /^PAYMENT RESMI$/m);
+    assert.match(teks, /\* 082243890517/);
+    assert.match(teks, /\* 08214369690/);
+    assert.match(teks, /Pay wajib menggunakan QRIS diatas/);
+
+    // QRIS resmi ikut dikirim dan tampil SEBELUM teks ("QRIS diatas").
+    assert.equal(hasil.qris, 'https://toko.test/qris-resmi.jpg');
+    assert.equal(hasil.qrisDulu, true);
 });
 
 test('pencarian banyak hasil menampilkan pilihan', async () => {

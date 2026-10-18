@@ -5,7 +5,7 @@
  * Chrome maupun jaringan. Tidak ada angka yang dihitung ulang di sini: harga
  * dan stok datang dari API Laravel.
  */
-import { angka, escapeWa, hurufMiring, potong, rentangHarga, rupiah } from './format.js';
+import { angka, escapeWa, hurufMiring, nomorLokal, potong, rentangHarga, rupiah } from './format.js';
 
 const GARIS = '━━━━━━━━━━━━━━━';
 
@@ -157,6 +157,33 @@ export function katalog(store, categories, opsi = {}) {
         `ⓘ 𝙩r𝙖n𝙨a𝙠𝙨i 𝙝a𝙣y𝙖 𝙠e𝙥a𝙙a 𝙖d𝙢i𝙣 𝙜r𝙤𝙪𝙥 *!*`,
         'ⓘ 𝙨e𝙬a 𝙗o𝙩 𝙠e𝙩i𝙠 .𝙤w𝙣e𝙧',
     );
+
+    return baris.join('\n');
+}
+
+/**
+ * Info pembayaran resmi (perintah `pay`): nomor admin/owner yang sah + aturan
+ * wajib lewat QRIS. Nomor diambil dari pengaturan toko (`owner_numbers`,
+ * satu per baris); kalau kosong, pakai nomor WhatsApp toko.
+ */
+export function pembayaranResmi(store) {
+    const daftar = (store.owner_numbers || []).filter(Boolean);
+    const nomor = daftar.length > 0 ? daftar : [store.whatsapp].filter(Boolean);
+
+    const baris = [
+        'PAYMENT RESMI',
+        '',
+        'Nomor admin/owner :',
+        ...nomor.map((n) => `* ${nomorLokal(n)}`),
+        'Selain nomor tersebut 100% bukan nomor saya. Dan saya tidak pernah chat cs duluan. Jika ada yang chat duluan 100% Pen!pu',
+        '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓',
+        '',
+        'Pay wajib menggunakan QRIS diatas. Jika berani transaksi diluar QRIS RESMI diatas bukan tanggung jawab saya.',
+    ];
+
+    if (!store.qris_url) {
+        baris.push('', '⚠️ Gambar QRIS belum diatur admin — hubungi nomor di atas.');
+    }
 
     return baris.join('\n');
 }

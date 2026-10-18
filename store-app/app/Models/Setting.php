@@ -37,6 +37,7 @@ class Setting extends Model
             ['payment', 'payment_mode', 'both', 'string', 'Mode pembayaran (manual/gateway/both)', false],
             ['payment', 'qris_image', '', 'file', 'Gambar QRIS statis', false],
             ['payment', 'qris_holder', '', 'string', 'Nama pemilik QRIS', false],
+            ['payment', 'owner_numbers', '', 'text', 'Nomor admin/owner resmi (satu per baris) — dipakai bot untuk perintah "pay"', false],
             ['payment', 'order_ttl_minutes', '60', 'int', 'Batas waktu bayar (menit)', false],
 
             ['gateway', 'tripay_mode', 'sandbox', 'string', 'Mode Tripay (sandbox/production)', false],

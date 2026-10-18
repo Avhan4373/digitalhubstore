@@ -48,6 +48,10 @@ class BotController extends Controller
                 'name' => Setting::storeName(),
                 'whatsapp' => Setting::whatsappNumber(),
                 'tagline' => (string) Setting::get('store_tagline', ''),
+                // Info pembayaran resmi untuk perintah `pay` bot.
+                'owner_numbers' => $this->ownerNumbers(),
+                'qris_url' => $this->qrisUrl(),
+                'qris_holder' => (string) Setting::get('qris_holder', ''),
             ],
             // Urutan kategori -> produk di sini adalah urutan nomor yang
             // dilihat pembeli. Bot menyusun daftar datar dari struktur ini,
@@ -297,5 +301,23 @@ class BotController extends Controller
 
         // Path dari pengaturan admin: URL penuh atau path disk publik.
         return filter_var($path, FILTER_VALIDATE_URL) ? $path : storage_url($path);
+    }
+
+    /**
+     * Nomor admin/owner resmi yang ditampilkan bot (`pay`): satu nomor per
+     * baris di pengaturan; koma juga diterima. Dinormalkan ke 62xxx.
+     *
+     * @return list<string>
+     */
+    private function ownerNumbers(): array
+    {
+        $mentah = preg_split('/[\r\n,;]+/', (string) Setting::get('owner_numbers', '')) ?: [];
+
+        return collect($mentah)
+            ->map(fn (string $baris) => wa_normalize($baris))
+            ->filter(fn (string $nomor) => strlen($nomor) >= 9 && str_starts_with($nomor, '62'))
+            ->unique()
+            ->values()
+            ->all();
     }
 }

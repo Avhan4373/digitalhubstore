@@ -46,6 +46,12 @@ function catatPesanan(chatId, invoice) {
  * di grup terlihat jelas pertanyaan mana yang diberi jawaban.
  */
 async function kirimHasil(chatId, hasil, balasId = null) {
+    // QRIS yang harus tampil DI ATAS teks (perintah `pay`): gambar dikirim
+    // lebih dulu, lalu pesan teks menyusul.
+    if (hasil.qris && hasil.qrisDulu) {
+        await adapter.kirimMedia(chatId, hasil.qris, hasil.qrisCaption || '💳 QRIS RESMI');
+    }
+
     let potonganPertama = true;
 
     for (const teks of hasil.replies || []) {
@@ -67,7 +73,7 @@ async function kirimHasil(chatId, hasil, balasId = null) {
 
     // Pembeli cek status pesanan yang belum dibayar: kirim ulang QRIS-nya,
     // karena gambar sebelumnya sering hilang di riwayat chat.
-    if (hasil.qris && !hasil.order) {
+    if (hasil.qris && !hasil.order && !hasil.qrisDulu) {
         await adapter.kirimMedia(chatId, hasil.qris, `💳 QRIS — ${hasil.invoice}`);
     }
 

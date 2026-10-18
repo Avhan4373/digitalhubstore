@@ -25,6 +25,38 @@ import { alasanDiabaikan, harusDiabaikan, adalahLid, nomorDariChatId, nomorDariK
 const { Client, LocalAuth, MessageMedia } = pkg;
 
 /**
+ * ID penuh (bentuk store) pesan WhatsApp, untuk quote/reply.
+ *
+ * Di whatsapp-web.js v1.34 `msg.id` TIDAK lagi punya `_serialized` langsung.
+ * Bentuk nyatanya (dibuktikan lewat log runtime):
+ *   {fromMe, remote, id, participant?, $1}
+ * `$1` = kunci store asli yang dipakai `WAWebCollections.Msg.get()`
+ * (mis. `false_...@g.us_3EB0ABCD_545...@lid` — grup menyertakan participant).
+ * Dipakai lebih dulu; kalau tidak ada, susun sendiri dari bagian-bagiannya.
+ */
+function idPesanPenuh(msg) {
+    const id = msg?.id;
+
+    if (!id) return null;
+
+    if (typeof id === 'string') return id;
+    if (id._serialized) return id._serialized;
+    if (id.$1) return id.$1;
+
+    const remote = typeof id.remote === 'object'
+        ? id.remote?._serialized || ''
+        : String(id.remote || '');
+
+    if (!remote || !id.id) return null;
+
+    const peserta = id.participant
+        ? `_${typeof id.participant === 'object' ? id.participant._serialized : id.participant}`
+        : '';
+
+    return `${id.fromMe ? 'true' : 'false'}_${remote}_${id.id}${peserta}`;
+}
+
+/**
  * Cari binary Chrome.
  *
  * Urutan: env BOT_CHROME_PATH -> Chrome 146 bundel -> Chrome sistem.
@@ -268,6 +300,32 @@ export function buatAdapterWhatsApp(handler) {
     async function kirimTeks(chatId, teks, opsi = {}) {
         const tujuan = sendToPerChat.get(chatId) || chatId;
 
+        log.debug(`kirimTeks chat=${maskNumber(nomorDariChatId(chatId))} tujuan=${maskNumber(nomorDariChatId(tujuan))} balasId=${opsi.balasId ? 'ada' : '-'}`);
+
+        // Diagnostik: apakah ID pesan yang mau diquote benar-benar ada di store
+        // WhatsApp dan boleh dibalas? (kalau tidak, library membuang quote
+        // diam-diam karena ignoreQuoteErrors default true)
+        if (opsi.balasId) {
+            const cek = await client.pupPage
+                .evaluate((id) => {
+                    try {
+                        const Msg = window.require('WAWebCollections').Msg;
+                        const pesan = Msg.get(id);
+
+                        if (!pesan) return 'tidak-ada-di-store';
+
+                        const Reply = window.require('WAWebMsgReply');
+
+                        return `ada|canReply=${Reply ? Reply.canReplyMsg(pesan.unsafe()) : pesan.canReply()}`;
+                    } catch (e) {
+                        return `error=${e.message}`;
+                    }
+                }, opsi.balasId)
+                .catch((e) => `tidak-bisa-cek=${e.message}`);
+
+            log.debug(`cek-quote ${opsi.balasId} -> ${cek}`);
+        }
+
         if (opsi.balasId && tujuan !== chatId) {
             try {
                 const berbalas = await client.sendMessage(chatId, teks, {
@@ -275,7 +333,7 @@ export function buatAdapterWhatsApp(handler) {
                 });
 
                 if (berbalas) {
-                    log.debug(`Terkirim (quote) ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)`);
+                    log.debug(`Terkirim (quote) ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter) | quote=${berbalas._data?.quotedStanzaId ? 'menempel' : 'TIDAK menempel'}`);
                     return true;
                 }
 
@@ -290,8 +348,8 @@ export function buatAdapterWhatsApp(handler) {
                 const kirimOpsi = i === 0 && opsi.balasId && tujuan === chatId
                     ? { quotedMessageId: opsi.balasId }
                     : undefined;
-                await client.sendMessage(tujuan, teks, kirimOpsi);
-                log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)`);
+                const terkirim = await client.sendMessage(tujuan, teks, kirimOpsi);
+                log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)${kirimOpsi ? ` | quote=${terkirim?._data?.quotedStanzaId ? 'menempel' : 'TIDAK menempel'}` : ''}`);
                 return true;
             } catch (e) {
                 const sementara = /Execution context was destroyed|detached Frame|Target closed/i.test(e.message || '');
@@ -380,7 +438,8 @@ export function buatAdapterWhatsApp(handler) {
         const dariGrup = String(chatId).includes('@g.us');
         // ID pesan pembeli: dipakai agar balasan pertama menjadi reply/quote
         // ke pesan ini, bukan pesan terpisah.
-        const pesanId = msg.id?._serialized || null;
+        const pesanId = idPesanPenuh(msg);
+        log.debug(`pesanId=${pesanId ?? '(kosong)'} | mentah=${JSON.stringify(msg.id)} | chat=${maskNumber(nomorDariChatId(chatId))}`);
 
         // Satu pesan error tidak boleh mematikan proses bot.
         try {

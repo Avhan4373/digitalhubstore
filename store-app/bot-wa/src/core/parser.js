@@ -14,6 +14,8 @@ const ALIAS = {
     riwayat: ['riwayat', 'history', 'pesananku', 'transaksi'],
     batal: ['batal', 'cancel', 'batalkan', 'reset'],
     lanjut: ['lanjut', 'next', 'lagi', 'more'],
+    // Info pembayaran resmi (nomor owner + QRIS resmi)
+    pay: ['pay', 'payment', 'pembayaran', 'bayar'],
 };
 
 function normalisasi(text) {

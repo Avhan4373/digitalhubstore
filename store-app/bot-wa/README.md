@@ -47,6 +47,7 @@ ditanyakan sebelum pesanan dibuat.
 |---|---|
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog gaya papan menu + tanggal/jam WIB |
 | nama produk (`canva`, `netflix`) | cari produk |
+| `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: nomor admin/owner sah + **gambar QRIS resmi dikirim lebih dulu**, baru teksnya ("QRIS diatas") |
 | gambar / "sudah transfer" / "bukti" | konfirmasi bukti transfer |
 | `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
@@ -55,6 +56,20 @@ ditanyakan sebelum pesanan dibuat.
 
 Pesanan yang dibuat bot **masuk ke database Laravel**, jadi muncul di panel
 admin, memotong stok, dan mengikuti aturan yang sama dengan pesanan web.
+
+## Perintah `pay` (info pembayaran resmi)
+
+Balasan `pay` memakai dua data dari panel admin (**Pengaturan**):
+
+| Pengaturan | Dipakai untuk |
+|---|---|
+| `owner_numbers` (Nomor admin/owner resmi, satu per baris) | daftar nomor `* 08…` di balasan `pay`; kosong = pakai nomor WhatsApp toko |
+| `qris_image` + `qris_holder` | gambar QRIS resmi yang dikirim bot sebelum teksnya |
+
+Nomor boleh ditulis `08…` maupun `62…` — bot selalu menampilkannya dalam bentuk
+`08…`. Gambar QRIS dikirim **lebih dulu** supaya kalimat "QRIS diatas" pada teks
+menunjuk ke gambar itu. Kalau QRIS belum diunggah admin, balasan `pay` menambah
+peringatan bahwa gambarnya belum diatur.
 
 ## Notifikasi pesanan selesai
 

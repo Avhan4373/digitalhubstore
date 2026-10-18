@@ -15,6 +15,12 @@ test('parse: list dengan nomor menjadi pilih_produk', () => {
     assert.deepEqual(parsePesan('katalog 10'), { type: 'pilih_produk', nomor: 10, teks: 'katalog 10' });
 });
 
+test('parse: pay / payment jadi perintah info pembayaran', () => {
+    for (const kata of ['pay', 'PAY', 'payment', 'pembayaran', 'bayar']) {
+        assert.equal(parsePesan(kata).type, 'pay', kata);
+    }
+});
+
 test('parse: invoice dikenali sebelum perintah lain', () => {
     assert.deepEqual(parsePesan('INV261017ABCDE'), { type: 'invoice', invoice: 'INV261017ABCDE', teks: 'INV261017ABCDE' });
     assert.deepEqual(parsePesan('inv261017abcde'), { type: 'invoice', invoice: 'INV261017ABCDE', teks: 'inv261017abcde' });

@@ -106,6 +106,19 @@ export function escapeWa(text) {
     return String(text || '').replace(/([*_~`])/g, '\\$1');
 }
 
+/**
+ * Nomor untuk ditampilkan ke pembeli: 6282243890517 -> "082243890517".
+ * Nomor yang sudah diawali 0 dibiarkan apa adanya.
+ */
+export function nomorLokal(number) {
+    const digits = String(number || '').replace(/\D/g, '');
+
+    if (digits === '') return '';
+    if (digits.startsWith('62')) return `0${digits.slice(2)}`;
+
+    return digits;
+}
+
 /** Normalisasi nomor WA Indonesia ke 62xxx. */
 export function normalisasiNomor(number) {
     const digits = String(number || '').replace(/\D/g, '');

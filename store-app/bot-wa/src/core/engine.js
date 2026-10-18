@@ -310,6 +310,20 @@ async function route(aksi, state, chatId, nomor, ctx) {
         return { replies: [R.katalog(data.store, kategori)] };
     }
 
+    // Info pembayaran resmi: nomor owner sah + QRIS resmi (gambar dikirim
+    // SEBELUM teks supaya "QRIS diatas" pada pesan tunjuk ke gambar itu).
+    if (aksi.type === 'pay') {
+        clearState(chatId);
+        const data = await ambilKatalog();
+
+        return {
+            replies: [R.pembayaranResmi(data.store)],
+            qris: data.store.qris_url || null,
+            qrisCaption: '💳 *QRIS RESMI* — scan untuk membayar',
+            qrisDulu: true,
+        };
+    }
+
     if (aksi.type === 'status') {
         clearState(chatId);
         return {
