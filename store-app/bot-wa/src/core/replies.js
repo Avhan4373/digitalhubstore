@@ -193,11 +193,12 @@ export function pembayaranResmi(store, adaQris = Boolean(store.qris_url)) {
  *
  * Semua nilai berasal dari konteks nyata: jam & tanggal WIB saat perintah
  * dikirim, nama grup WhatsApp tempat perintah ditulis (fallback nama toko),
- * catatan pesanan, dan nama pembeli dari pesanan terakhir di chat itu.
+ * dan catatan pesanan. Pesan hanya berisi ringkasan ini — cukup sampai
+ * catatan, tidak ada kalimat penutup.
  *
- * @param {{status: 'pending'|'berhasil', grup?: string, catatan: string, pembeli?: string, date?: Date}} data
+ * @param {{status: 'pending'|'berhasil', grup?: string, catatan: string, date?: Date}} data
  */
-export function transaksi({ status, grup = '', catatan, pembeli = '', date = new Date() }) {
+export function transaksi({ status, grup = '', catatan, date = new Date() }) {
     const { tanggal, jam } = tanggalWaktuWIB(date);
     const judul = status === 'berhasil'
         ? '*_TRANSAKSI BERHASIL「 ✅ 」_*'
@@ -210,8 +211,6 @@ export function transaksi({ status, grup = '', catatan, pembeli = '', date = new
         `📅 Tanggal  : ${tanggal}`,
         `📂 Grup     : ${grup}`,
         `📝 Catatan  : ${catatan}`,
-        '',
-        `${pembeli ? `@${pembeli} ` : ''}_Terima kasih sudah order!_`,
     ];
 
     return baris.join('\n');
@@ -449,7 +448,8 @@ export function mintaNomor(produk, varian) {
 }
 
 /** Permintaan data wajib sebelum pesanan dibuat. */
-export function mintaDataWajib(produk, varian, label) {    const baris = [
+export function mintaDataWajib(produk, varian, label) {
+    const baris = [
         `📝 *${produk.name} — ${varian.name}*`,
         `${rupiah(varian.price)}`,
         '',

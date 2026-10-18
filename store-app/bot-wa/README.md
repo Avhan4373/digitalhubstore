@@ -119,8 +119,8 @@ Admin (nomor di `BOT_ADMIN_NUMBERS`) mengetik di chat:
 | `done` (juga `selesai`, `berhasil`) | `*_TRANSAKSI BERHASIL「 ✅ 」_*` |
 
 Balasannya memuat jam & tanggal WIB saat perintah ditulis, **nama grup WhatsApp**
-tempat perintah ditulis (di chat pribadi dipakai nama toko), catatan pesanan, dan
-nama pembeli dari pesanan terakhir yang dibuat bot di chat itu:
+tempat perintah ditulis (di chat pribadi dipakai nama toko), dan catatan pesanan.
+Pesan hanya berisi ringkasan ini — cukup sampai catatan, tidak ada kalimat penutup:
 
 ```
 *_TRANSAKSI PENDING ✅ 」_*
@@ -129,8 +129,6 @@ nama pembeli dari pesanan terakhir yang dibuat bot di chat itu:
 📅 Tanggal  : 18 Oktober 2026
 📂 Grup     : DIGITALHUB OFFICIAL
 📝 Catatan  : GPT PLUS SHARE 1 BULAN
-
-@Mustaqim / Afik _Terima kasih sudah order!_
 ```
 
 - Catatan boleh ditulis sendiri: `proses LANDING PAGE 1 TAHUN`. Kalau tidak

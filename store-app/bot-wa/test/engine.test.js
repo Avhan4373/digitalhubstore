@@ -309,7 +309,8 @@ test('admin: proses mengirim pengumuman TRANSAKSI PENDING di grup', async () => 
     assert.match(teks, /📅 Tanggal {2}: \d{1,2} \w+ 20\d{2}/);
     assert.match(teks, /📂 Grup {5}: DIGITALHUB OFFICIAL/);
     assert.match(teks, /📝 Catatan {2}: GPT PLUS SHARE 1 BULAN/);
-    assert.match(teks, /@Mustaqim \/ Afik _Terima kasih sudah order!_$/);
+    // Cukup sampai catatan — tidak ada pesan penutup setelahnya.
+    assert.doesNotMatch(teks, /Terima kasih/);
 });
 
 test('admin: done mengirim pengumuman TRANSAKSI BERHASIL', async () => {
