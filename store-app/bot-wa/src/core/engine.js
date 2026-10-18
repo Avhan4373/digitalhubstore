@@ -128,6 +128,29 @@ export function cariProduk(daftar, kata) {
     );
 }
 
+/**
+ * Nama paket dipakai memilih varian (layar detail tidak menampilkan nomor).
+ * Kecocokan nama persis menang; kalau tidak ada, nama yang "berisi" kata itu.
+ * Return: daftar INDEX varian yang cocok (0 = paket pertama) — kosong kalau
+ * tidak cocok, sehingga pemanggil bisa lanjut ke pencarian produk.
+ */
+export function cariVarian(varian, kata) {
+    const q = String(kata || '').toLowerCase().trim();
+    if (q === '') return [];
+
+    const indeksPersis = [];
+    const indeksBerisi = [];
+
+    (varian || []).forEach((v, i) => {
+        const nama = String(v?.name || '').toLowerCase();
+
+        if (nama === q) indeksPersis.push(i);
+        else if (nama.includes(q)) indeksBerisi.push(i);
+    });
+
+    return indeksPersis.length > 0 ? indeksPersis : indeksBerisi;
+}
+
 function formatPilihanProduk(hasil) {
     const baris = ['🔍 *Hasil pencarian*', ''];
 
@@ -315,6 +338,17 @@ async function route(aksi, state, chatId, nomor, ctx) {
 
     // -------------------------------------------------------------- pencarian
     if (aksi.type === 'cari') {
+        // Layar detail tanpa nomor urut: teks bisa berupa NAMA paket
+        // ("1 bulan famplan"). Kecocokan tunggal langsung dipesan; kalau
+        // ambigu/tidak ada, lanjut ke pencarian produk seperti biasa.
+        if (state?.tahap === STATE.DETAIL) {
+            const pilihanPaket = cariVarian(state.varian || [], aksi.kata);
+
+            if (pilihanPaket.length === 1) {
+                return pilihVarian(state, pilihanPaket[0] + 1, chatId, nomor, ctx);
+            }
+        }
+
         const data = await ambilKatalog();
         const daftar = daftarProdukDatar(batasiKatalog(data, config.batasProduk));
         const hasil = cariProduk(daftar, aksi.kata);

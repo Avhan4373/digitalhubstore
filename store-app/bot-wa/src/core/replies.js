@@ -5,7 +5,7 @@
  * Chrome maupun jaringan. Tidak ada angka yang dihitung ulang di sini: harga
  * dan stok datang dari API Laravel.
  */
-import { escapeWa, potong, rentangHarga, rupiah } from './format.js';
+import { angka, escapeWa, hurufMiring, potong, rentangHarga, rupiah } from './format.js';
 
 const GARIS = '━━━━━━━━━━━━━━━';
 
@@ -73,8 +73,8 @@ export function sambutan(store) {
         '',
         'Cara pesan:',
         '1. Ketik *list*',
-        '2. Balas *nomor* produk',
-        '3. Balas *nomor* paket',
+        '2. Ketik *nama layanan* (mis. canva)',
+        '3. Balas *nama paket* atau nomornya',
         '4. Bayar lewat QRIS yang dikirim',
         '5. Kirim bukti transfer',
         '',
@@ -101,8 +101,8 @@ export function bantuan(store) {
         '',
         '*Cara pesan:*',
         '1. *list* — lihat katalog',
-        '2. Balas *nomor* produk',
-        '3. Balas *nomor* paket',
+        '2. Ketik *nama layanan*',
+        '3. Balas *nama paket* atau nomornya',
         '4. Bayar lewat QRIS',
         '5. Kirim bukti transfer',
         '',
@@ -162,47 +162,38 @@ export function katalog(store, categories, opsi = {}) {
 }
 
 /**
- * Detail satu produk + daftar paket.
+ * Detail satu produk + daftar paket, gaya "menu toko": judul produk huruf
+ * besar, lalu tiap paket dalam bentuk "Nama : *harga*" — harga tanpa "Rp",
+ * diikuti catatan data wajib (`required_fields`) berhuruf miring matematika.
+ * Paket dipilih pembeli lewat NAMA paket (angka tetap diterima sebagai
+ * kompatibilitas; pemilihan nama ditangani `cariVarian()` di engine).
+ *
+ * Harga tetap datang dari API Laravel — tidak ada angka yang dihitung di sini.
+ *
  * @param {object} produk
  * @param {Array} varian
  */
 export function detailProduk(produk, varian) {
-    const baris = [`📦 *${escapeWa(produk.name)}*`, GARIS, ''];
-
-    if (produk.description) {
-        baris.push(potong(escapeWa(produk.description), 300), '');
-    }
-
-    if (produk.warranty) {
-        baris.push(`🛡️ Garansi: ${escapeWa(produk.warranty)}`, '');
-    }
-
     if (varian.length === 0) {
-        baris.push('⚠️ Belum ada paket tersedia.', '', 'Ketik *bantuan* untuk tanya admin.');
-        return baris.join('\n').trim();
+        return [
+            `*${escapeWa(produk.name).toUpperCase()}*`,
+            '',
+            '⚠️ Belum ada paket tersedia.',
+            'Ketik *bantuan* untuk tanya admin.',
+        ].join('\n');
     }
 
-    baris.push('💰 *Pilih paket:*');
+    const baris = [`*${escapeWa(produk.name).toUpperCase()}*`, ''];
 
-    varian.forEach((v, i) => {
-        const habis = !v.purchasable;
-        const stok = v.stock === null ? '' : v.stock > 0 ? ` (stok ${v.stock})` : ' (habis)';
-        const harga = v.original_price
-            ? `~${rupiah(v.original_price)}~ ${rupiah(v.price)}`
-            : rupiah(v.price);
+    for (const v of varian) {
+        baris.push(`${escapeWa(v.name)} : *${angka(v.price)}*${v.purchasable ? '' : ' ❌'}`);
 
-        baris.push(`${i + 1}. ${escapeWa(v.name)} — ${harga}${habis ? ' ❌' : stok}`);
-    });
+        for (const label of v.required_fields || []) {
+            baris.push(`* ${hurufMiring(label)}`);
+        }
+    }
 
-    baris.push(
-        '',
-        'Ketik *nomor* paket untuk pesan.',
-        'Contoh: *1*',
-        '',
-        'Ketik *list* untuk kembali ke katalog.',
-    );
-
-    return baris.join('\n').trim();
+    return baris.join('\n');
 }
 
 /**

@@ -26,7 +26,8 @@ mengarang data.
 ```
 1. Ketik list  -> katalog tampil (papan menu, nama layanan huruf besar)
 2. Balas nama layanan (mis. "netflix")  -> daftar paket
-3. Balas nomor paket   -> pesanan dibuat + QRIS dikirim
+3. Balas nama paket (mis. "1 bulan famplan") atau nomornya
+   -> pesanan dibuat + QRIS dikirim
 4. Bayar, lalu kirim bukti transfer ke chat ini
 5. Admin verifikasi di panel
 6. Bot otomatis kirim isi akun

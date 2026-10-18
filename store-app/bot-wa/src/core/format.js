@@ -16,6 +16,29 @@ export function rupiah(value) {
 }
 
 /**
+ * Ubah huruf Latin jadi huruf miring matematika (𝑖𝑛𝑣𝑖𝑡𝑒, 𝐴𝑐𝑐) untuk
+ * catatan gaya "papan menu" di bot. Karakter non-huruf dibiarkan apa adanya;
+ * Huruf H/h miring di luar rentang berurutan (ℎ, U+210E).
+ */
+export function hurufMiring(text) {
+    const basisBesar = 0x1d434 - 65; // 'A'
+    const basisKecil = 0x1d44e - 97; // 'a'
+    let hasil = '';
+
+    for (const karakter of String(text || '')) {
+        const kode = karakter.codePointAt(0);
+
+        if (karakter === 'H') hasil += '\u210e';
+        else if (karakter === 'h') hasil += '\u210e';
+        else if (kode >= 65 && kode <= 90) hasil += String.fromCodePoint(kode + basisBesar);
+        else if (kode >= 97 && kode <= 122) hasil += String.fromCodePoint(kode + basisKecil);
+        else hasil += karakter;
+    }
+
+    return hasil;
+}
+
+/**
  * Rentang harga: satu harga atau "Rp5.000 – Rp35.000".
  */
 export function rentangHarga(min, max) {

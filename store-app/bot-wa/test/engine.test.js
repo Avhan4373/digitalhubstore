@@ -82,7 +82,15 @@ function stubDefault() {
     stubFetch((path) => {
         if (path === '/api/bot/katalog') return KATALOG;
         if (path === '/api/bot/produk/gemini-pro') return DETAIL;
-        if (path === '/api/bot/produk/canva-pro') return { ...DETAIL, product: { ...DETAIL.product, slug: 'canva-pro', name: 'Canva Pro' } };
+        if (path === '/api/bot/produk/canva-pro')
+            return {
+                ...DETAIL,
+                product: { ...DETAIL.product, slug: 'canva-pro', name: 'Canva Pro' },
+                variants: [
+                    { ...DETAIL.variants[0], required_fields: ['Email Canva'] },
+                    ...DETAIL.variants.slice(1),
+                ],
+            };
         if (path === '/api/bot/produk/netflix') return { ...DETAIL, product: { ...DETAIL.product, slug: 'netflix', name: 'Netflix' } };
         if (path === '/api/bot/pesanan') return { order: PESANAN, payment: { method: 'qris_manual', qris_url: 'https://toko.test/qris.jpg', holder: 'Creative Solutions', expires_at: null } };
         if (path === '/api/bot/pesanan/status') return { order: PESANAN, contents: [] };
@@ -135,7 +143,7 @@ test('list menampilkan menu bergaya papan nama + sapaan/tanggal', async () => {
 test('balas nama layanan membuka detail produknya', async () => {
     const { replies } = await kirim('canva pro');
 
-    assert.match(replies[0], /Canva Pro/);
+    assert.match(replies[0], /CANVA PRO/);
 
     const produkCall = panggilan.filter((p) => p.path.startsWith('/api/bot/produk/'));
     assert.equal(produkCall.at(-1).path, '/api/bot/produk/canva-pro', '"canva pro" harus menunjuk Canva Pro');
@@ -145,22 +153,44 @@ test('angka setelah list membuka detail produk yang benar', async () => {
     await kirim('list');
     const { replies } = await kirim('2');
 
-    assert.match(replies[0], /Canva Pro/);
+    assert.match(replies[0], /CANVA PRO/);
 
     const produkCall = panggilan.filter((p) => p.path.startsWith('/api/bot/produk/'));
     assert.equal(produkCall.at(-1).path, '/api/bot/produk/canva-pro', 'nomor 2 harus menunjuk Canva Pro');
 });
 
-test('detail menampilkan semua varian + harga + stok', async () => {
+test('detail bergaya menu: nama paket + harga bold tanpa nomor', async () => {
     await kirim('list');
     const { replies } = await kirim('1');
     const teks = replies[0];
 
-    assert.match(teks, /Gemini Pro/);
-    assert.match(teks, /1\. Sharing 1 Bulan — Rp5\.000/);
-    assert.match(teks, /2\. Private 1 Bulan — ~Rp40\.000~ Rp35\.000/);
-    assert.match(teks, /stok 5/);
-    assert.match(teks, /3\. Private 1 Tahun.*❌/);
+    assert.match(teks, /^\*GEMINI PRO\*$/m);
+    assert.match(teks, /Sharing 1 Bulan : \*5\.000\*/);
+    assert.match(teks, /Private 1 Bulan : \*35\.000\*/);
+    assert.match(teks, /Private 1 Tahun : \*200\.000\* ❌/);
+    // Tanpa nomor urut: pembeli membalas nama paket.
+    assert.doesNotMatch(teks, /^1\. /m);
+});
+
+test('varian dengan data wajib menampilkan catatan huruf miring', async () => {
+    await kirim('list');
+    const { replies } = await kirim('2'); // Canva Pro -> punya catatan "Email Canva"
+    const teks = replies[0];
+
+    const { hurufMiring } = await import('../src/core/format.js');
+    // Catatan di bawah baris paket: "* 𝐸𝑚𝑎𝑖𝑙 𝐶𝑎𝑛𝑣𝑎"
+    assert.match(teks, new RegExp('\\* ' + hurufMiring('Email Canva')));
+});
+
+test('paket dipilih lewat namanya di layar detail', async () => {
+    await kirim('list');
+    await kirim('1'); // ke detail Gemini Pro
+    const { replies } = await kirim('sharing 1 bulan');
+
+    assert.match(replies[0], /Pesanan dibuat|Scan QRIS|QRIS/i);
+
+    const orderCall = panggilan.filter((p) => p.path === '/api/bot/pesanan');
+    assert.equal(orderCall.length, 1, 'nama paket harus langsung membuat pesanan');
 });
 
 // ---------------------------------------------------------------- alur pesan
@@ -239,14 +269,14 @@ test('list bisa dipakai lagi dari layar pilih paket', async () => {
 
     // State keluar: angka berikutnya membuka produk lagi.
     const detailLagi = await kirim('1');
-    assert.match(detailLagi.replies[0], /Pilih paket/);
+    assert.match(detailLagi.replies[0], /^\*GEMINI PRO\*$/m);
 });
 
 // ------------------------------------------------------------------- pencarian
 
 test('pencarian satu hasil langsung membuka detail', async () => {
     const { replies } = await kirim('netflix');
-    assert.match(replies[0], /Netflix/);
+    assert.match(replies[0], /^\*NETFLIX\*$/m);
 });
 
 test('pencarian banyak hasil menampilkan pilihan', async () => {
