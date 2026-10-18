@@ -222,6 +222,16 @@ WantedBy=multi-user.target
   `node uji-media.mjs 628xxxxxxxxxx@c.us "caption uji"`. Skrip ini login dengan
   sesi yang sama, mengirim `qris.jpeg` ke chat tujuan, lalu keluar — berguna
   untuk memastikan gambar benar-benar sampai setelah upgrade/patch.
+- **Uji quote/reply:** `node uji-quote.mjs 1203xxxxxxxxx@g.us "teks uji"` (bot
+  berhenti dulu). Perlu diketahui WhatsApp menolak quote **pesan sendiri**
+  (`canReplyMsg() = false`), jadi skrip ini paling berguna untuk memastikan
+  API-nya tidak melempar error; bukti quote untuk pesan pembeli muncul di log
+  bot sebagai `cek-kutipan -> menempel (quotedStanzaID,…)`.
+- **`sendMessage()` v1.34.7 kadang mengembalikan `undefined`** walau pesan
+  terkirim (`newMsgKey._serialized` kosong untuk JID `@lid`). Karena itu bot
+  TIDAK memakai nilai balik itu sebagai penentu berhasil/gagal — kalau dipakai,
+  pesan bisa terkirim dua kali. Status quote dibaca ulang dari store WhatsApp
+  (`cek-kutipan`).
 - **ID pesan untuk quote/reply.** Di v1.34.7 `msg.id` tidak punya
   `_serialized`; kunci store aslinya ada di `msg.id.$1`
   (`false_<chat>_<id>` dan menyertakan `participant` di grup) dan itulah yang

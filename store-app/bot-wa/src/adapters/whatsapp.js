@@ -332,10 +332,46 @@ export function buatAdapterWhatsApp(handler) {
      * `ignoreQuoteErrors` default true). Karena itu percobaan quote selalu ke
      * chat asal dulu; kalau gagal/tidak terkirim, kirim biasa ke tujuan.
      */
-    /** Catat hasil kirim + status quote (field `quotedMsg` model pesan). */
+    /**
+     * Baca dari store WhatsApp apakah pesan TERAKHIR di chat benar-benar
+     * menyimpan data quote.
+     *
+     * Nilai balik `sendMessage()` tidak bisa dipercaya di v1.34.7
+     * (`newMsgKey._serialized` kosong → mengembalikan `undefined` walau pesan
+     * terkirim), jadi satu-satunya bukti yang sahih adalah model pesan yang
+     * tersimpan: pesan ber-quote punya kunci `quotedStanzaID`/`quotedMsg`.
+     */
+    async function cekKutipanTersimpan(chatId) {
+        return client.pupPage
+            .evaluate((id) => {
+                const chat = window.require('WAWebCollections').Chat.get(id);
+                const daftar = chat?.msgs?.getModelsArray?.() || [];
+                const terakhir = daftar[daftar.length - 1];
+
+                if (!terakhir) return 'tidak-ada-pesan';
+
+                const kunci = Object.keys(terakhir).filter((k) => /^quoted/i.test(k));
+
+                return kunci.length > 0 ? `menempel (${kunci.join(',')})` : 'TIDAK menempel';
+            }, chatId)
+            .catch((e) => `tak-terbaca=${e.message}`);
+    }
+
+    /**
+     * Catat hasil kirim + status quote.
+     *
+     * PENTING: whatsapp-web.js v1.34.7 mengembalikan `undefined` dari
+     * `sendMessage()` kalau `newMsgKey._serialized` kosong (bug @lid MsgKey),
+     * padahal pesannya BENAR-BENAR terkirim. Jadi `undefined` tidak boleh
+     * dianggap gagal — status quote dibaca ulang dari store (lihat
+     * `cekKutipanTersimpan`).
+     */
     function logKirim(label, chatId, pesan, dicobaQuote) {
+        const bisaDibaca = Boolean(pesan);
         const menempel = Boolean(pesan?.hasQuotedMsg ?? pesan?._data?.quotedMsg);
-        const status = dicobaQuote ? ` | quote=${menempel ? 'menempel' : 'TIDAK menempel'}` : '';
+        const status = dicobaQuote
+            ? ` | quote=${!bisaDibaca ? 'tak-terbaca' : menempel ? 'menempel' : 'TIDAK menempel'}`
+            : '';
 
         log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${label})${status}`);
     }
@@ -380,24 +416,23 @@ export function buatAdapterWhatsApp(handler) {
      * `buat(tujuan, opsi)` membangun panggilan `client.sendMessage`. Urutannya:
      *   1. kalau tujuan kirim berbeda dari chat asal (kasus DM `@lid`), quote
      *      dicoba dulu KE CHAT ASAL — ID pesan hanya dikenal di chat itu;
-     *   2. kalau gagal, kirim biasa tanpa quote (dengan 3x ulang untuk error
-     *      konteks WA yang hilang, mis. saat WhatsApp Web reload).
+     *   2. kalau panggilan itu MELEMPAR error, kirim biasa tanpa quote (dengan
+     *      3x ulang untuk error konteks WA yang hilang, mis. WhatsApp reload).
      *
-     * @returns {Promise<boolean>} true kalau pesan terkirim
+     * Nilai balik `sendMessage()` tidak dipakai sebagai penentu berhasil/gagal:
+     * di v1.34.7 fungsi itu mengembalikan `undefined` walau pesan terkirim
+     * (bug `newMsgKey._serialized`), jadi mengeceknya bisa memicu kirim DOBEL.
+     *
+     * @returns {Promise<boolean>} true kalau panggilan kirim tidak melempar error
      */
     async function kirimKe(chatId, tujuan, buat, label, balasId) {
         if (balasId && tujuan !== chatId) {
             try {
-                const berbalas = await buat(chatId, { quotedMessageId: balasId });
-
-                if (berbalas) {
-                    logKirim(label, chatId, berbalas, true);
-                    return true;
-                }
-
-                log.debug('Quote ke chat asal tidak berhasil, lanjut kirim biasa.');
+                logKirim(label, chatId, await buat(chatId, { quotedMessageId: balasId }), true);
+                log.debug(`cek-kutipan (chat asal) -> ${await cekKutipanTersimpan(chatId)}`);
+                return true;
             } catch (e) {
-                log.warn(`Quote gagal (${e.message}); kirim biasa.`);
+                log.warn(`Quote ke chat asal gagal (${e.message}); kirim biasa.`);
             }
         }
 
@@ -407,8 +442,12 @@ export function buatAdapterWhatsApp(handler) {
                 : undefined;
 
             try {
-                const terkirim = await buat(tujuan, opsiQuote);
-                logKirim(label, chatId, terkirim, Boolean(opsiQuote));
+                logKirim(label, chatId, await buat(tujuan, opsiQuote), Boolean(opsiQuote));
+
+                if (opsiQuote) {
+                    log.debug(`cek-kutipan -> ${await cekKutipanTersimpan(tujuan)}`);
+                }
+
                 return true;
             } catch (e) {
                 const sementara = /Execution context was destroyed|detached Frame|Target closed/i.test(e.message || '');
