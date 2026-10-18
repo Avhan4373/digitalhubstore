@@ -45,13 +45,13 @@ function catatPesanan(chatId, invoice) {
  * dikirim sebagai reply/quote ke pesan pembeli (jika ID-nya tersedia) supaya
  * di grup terlihat jelas pertanyaan mana yang diberi jawaban.
  */
-async function kirimHasil(sendTo, hasil, balasId = null) {
+async function kirimHasil(chatId, hasil, balasId = null) {
     let potonganPertama = true;
 
     for (const teks of hasil.replies || []) {
         for (const potongan of pecahPesan(teks)) {
             const opsi = potonganPertama && balasId ? { balasId } : {};
-            await adapter.kirim(sendTo, potongan, opsi);
+            await adapter.kirim(chatId, potongan, opsi);
             potonganPertama = false;
         }
     }
@@ -59,7 +59,7 @@ async function kirimHasil(sendTo, hasil, balasId = null) {
     // QRIS hanya dikirim kalau pesanan baru benar-benar dibuat.
     if (hasil.order && hasil.payment?.qris_url) {
         await adapter.kirimMedia(
-            sendTo,
+            chatId,
             hasil.payment.qris_url,
             `💳 QRIS — ${hasil.order.invoice}\nTotal: Rp${Number(hasil.order.total).toLocaleString('id-ID')}`,
         );
@@ -68,7 +68,7 @@ async function kirimHasil(sendTo, hasil, balasId = null) {
     // Pembeli cek status pesanan yang belum dibayar: kirim ulang QRIS-nya,
     // karena gambar sebelumnya sering hilang di riwayat chat.
     if (hasil.qris && !hasil.order) {
-        await adapter.kirimMedia(sendTo, hasil.qris, `💳 QRIS — ${hasil.invoice}`);
+        await adapter.kirimMedia(chatId, hasil.qris, `💳 QRIS — ${hasil.invoice}`);
     }
 
     if (hasil.order) {
@@ -119,14 +119,11 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
             batasRate: config.rateLimitPerMinute,
         });
 
-        const tujuan = sendTo || chatId;
-
         if (hasil.order) catatPesanan(chatId, hasil.order.invoice);
 
-        // Quote hanya ke pesan yang memilih produk kalau tujuan = chat asal
-        // (di chat @lid tujuan bisa JID nomor HP; cross-chat quote bisa gagal,
-        // tapi kirimTeks sudah punya fallback tanpa quote).
-        await kirimHasil(tujuan, hasil, pesanId);
+        // Kirim ke CHAT ASAL (adapter yang menyelesaikan tujuan per chat) dan
+        // bawa ID pesan pemicu supaya potongan pertama jadi quote/reply.
+        await kirimHasil(chatId, hasil, pesanId);
     } catch (e) {
         // Jangan biarkan satu pesan yang gagal mematikan proses bot atau
         // meninggalkan pembeli tanpa balasan.

@@ -257,15 +257,40 @@ export function buatAdapterWhatsApp(handler) {
     /**
      * Kirim teks dengan retry saat WA Web sedang reload.
      * `Execution context was destroyed` / `detached Frame` bersifat sementara.
-     * `opsi.balasId` (opsional) membuat pesan jadi reply/quote ke pesan
-     * pembeli; kalau kirim dengan quote gagal, percobaan berikutnya lepas
-     * quote supaya balasan tetap sampai.
+     *
+     * `opsi.balasId` (opsional) membuat pesan jadi reply/quote. Quote HARUS
+     * dilakukan ke chat yang memuat pesan yang diquote: di chat `@lid` tujuan
+     * dikonversi ke JID nomor HP, dan ID pesan `@lid` tidak dikenal di chat
+     * itu — WhatsApp diam-diam membuang quote (whatsapp-web.js
+     * `ignoreQuoteErrors` default true). Karena itu percobaan quote selalu ke
+     * chat asal dulu; kalau gagal/tidak terkirim, kirim biasa ke tujuan.
      */
     async function kirimTeks(chatId, teks, opsi = {}) {
+        const tujuan = sendToPerChat.get(chatId) || chatId;
+
+        if (opsi.balasId && tujuan !== chatId) {
+            try {
+                const berbalas = await client.sendMessage(chatId, teks, {
+                    quotedMessageId: opsi.balasId,
+                });
+
+                if (berbalas) {
+                    log.debug(`Terkirim (quote) ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)`);
+                    return true;
+                }
+
+                log.debug('Quote ke chat asal tidak berhasil, lanjut kirim biasa.');
+            } catch (e) {
+                log.warn(`Quote gagal (${e.message}); kirim biasa.`);
+            }
+        }
+
         for (let i = 0; i < 3; i += 1) {
             try {
-                const kirimOpsi = i === 0 && opsi.balasId ? { quotedMessageId: opsi.balasId } : undefined;
-                await client.sendMessage(chatId, teks, kirimOpsi);
+                const kirimOpsi = i === 0 && opsi.balasId && tujuan === chatId
+                    ? { quotedMessageId: opsi.balasId }
+                    : undefined;
+                await client.sendMessage(tujuan, teks, kirimOpsi);
                 log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)`);
                 return true;
             } catch (e) {
@@ -372,9 +397,10 @@ export function buatAdapterWhatsApp(handler) {
         mulai: () => client.initialize(),
 
         async kirim(chatId, teks, opsi = {}) {
-            const tujuan = sendToPerChat.get(chatId) || chatId;
-
-            return antre(chatId, () => kirimTeks(tujuan, teks, opsi));
+            // chatId = chat ASAL pesan (peta sendToPerChat menunjuk tujuan
+            // kirim). kirimTeks yang menyelesaikan tujuan supaya bisa memilih
+            // chat mana yang dipakai untuk quote.
+            return antre(chatId, () => kirimTeks(chatId, teks, opsi));
         },
 
         async kirimMedia(chatId, url, caption) {
