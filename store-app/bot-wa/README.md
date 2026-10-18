@@ -28,8 +28,8 @@ mengarang data.
 2. Balas nama layanan (mis. "netflix")  -> daftar paket
 3. Balas nama paket (mis. "1 bulan famplan") atau nomornya
    -> pesanan dibuat + QRIS dikirim
-4. Bayar, lalu kirim bukti transfer ke chat ini
-5. Admin verifikasi di panel
+4. Bayar, lalu kirim bukti transfer ke chat ini  -> bot DIAM (lihat bawah)
+5. Admin cek pembayaran, lalu ketik `proses ...` / `done ...` di chat itu
 6. Bot otomatis kirim isi akun
 ```
 
@@ -37,6 +37,11 @@ Bot **tidak** menanyakan nama atau konfirmasi: begitu paket dipilih, pesanan
 langsung dibuat dan QRIS langsung terkirim. Nama pembeli diambil dari nama
 tampilan WhatsApp. Balasan pertama bot dikirim sebagai **reply/quote** ke pesan
 pembeli (terutama terlihat di grup), sisanya pesan biasa.
+
+**Bukti transfer tidak dibalas bot.** Gambar (atau teks "sudah transfer", "bukti",
+"tf") hanya dicatat di log — tidak ada balasan apa pun, termasuk kalau pesanannya
+tidak ditemukan. Verifikasi pembayaran memang manual: admin mengecek di panel,
+lalu mengabari pembeli lewat perintah `proses`/`done` (lihat bawah).
 
 Hanya varian yang benar-benar butuh data (mis. "Email Canva") yang masih
 ditanyakan sebelum pesanan dibuat.
@@ -48,7 +53,7 @@ ditanyakan sebelum pesanan dibuat.
 | `list` (juga `katalog`, `produk`, `menu`, `daftar`, `harga`) | katalog gaya papan menu + tanggal/jam WIB |
 | nama produk (`canva`, `netflix`) | cari produk |
 | `pay` (juga `payment`, `pembayaran`, `bayar`) | info pembayaran resmi: **satu pesan** = gambar QRIS + teks "PAYMENT RESMI" sebagai caption (nomor admin/owner sah + aturan wajib QRIS) |
-| gambar / "sudah transfer" / "bukti" | konfirmasi bukti transfer |
+| gambar / "sudah transfer" / "bukti" | **tidak dibalas** — admin mengecek manual lalu mengabari lewat `proses`/`done` |
 | `status` lalu nomor invoice | status + isi akun (**kalau lunas**) |
 | `riwayat` | daftar pesanan dari nomor ini |
 | `bantuan` / `cs` | panduan + tautan admin |
@@ -104,6 +109,8 @@ nama pembeli dari pesanan terakhir yang dibuat bot di chat itu:
 - Catatan boleh ditulis sendiri: `proses LANDING PAGE 1 TAHUN`. Kalau tidak
   ditulis, dipakai nama produk + paket dari **pesanan terakhir** yang dibuat bot
   di chat itu; kalau belum ada pesanan di chat itu, bot meminta catatannya.
+- Karena bukti transfer **tidak** dibalas bot, pengumuman `proses`/`done` inilah
+  kabar pertama yang diterima pembeli — kirim `proses` setelah pembayaran dicek.
 - **Hanya nomor admin.** Pembeli yang mengetik `proses`/`done` tidak dilayani —
   teksnya diperlakukan sebagai pencarian produk biasa.
 - Bot **tidak** mengubah status pesanan; verifikasi tetap dilakukan admin di

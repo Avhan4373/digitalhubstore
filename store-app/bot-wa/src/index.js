@@ -156,6 +156,15 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesan
 
         if (hasil.order) catatPesanan(chatId, hasil.order);
 
+        // Bukti transfer: bot sengaja DIAM. Verifikasi manual oleh admin, dan
+        // pembeli baru dikabari lewat perintah admin `proses`/`done`.
+        if (hasil.bukti) {
+            log.info(
+                `Bukti transfer dari ${maskNumber(nomor)} — bot tidak membalas `
+                + '(admin cek pembayaran, lalu balas `proses`/`done` di chat itu).',
+            );
+        }
+
         // Kirim ke CHAT ASAL (adapter yang menyelesaikan tujuan per chat) dan
         // bawa ID pesan pemicu supaya potongan pertama jadi quote/reply.
         await kirimHasil(chatId, hasil, pesanId);

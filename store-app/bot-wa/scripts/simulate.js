@@ -37,6 +37,12 @@ function cetakBalasan(hasil) {
         }
     }
 
+    if (hasil.replies?.length === 0 && hasil.bukti) {
+        console.log('');
+        console.log('(bukti transfer: bot sengaja tidak membalas — admin cek manual,');
+        console.log(' lalu balas `proses`/`done` di chat itu)');
+    }
+
     if (hasil.order) {
         transaksiTerakhir = {
             invoice: hasil.order.invoice,

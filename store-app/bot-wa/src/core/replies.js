@@ -317,28 +317,6 @@ export function pesananDibuat(pesanan, pembayaran, store) {
     return baris.join('\n').trim();
 }
 
-/** Konfirmasi bukti transfer diterima. */
-export function buktiDiterima(adaPesanan) {
-    if (!adaPesanan) {
-        return [
-            '📸 Terima kasih atas buktinya.',
-            '',
-            'Namun saya tidak menemukan pesanan yang menunggu pembayaran dari nomor ini.',
-            '',
-            'Ketik *riwayat* untuk melihat pesanan Anda.',
-        ].join('\n');
-    }
-
-    return [
-        '📸 *Bukti transfer diterima!*',
-        '',
-        'Pesanan Anda sedang diverifikasi admin.',
-        'Isi akun akan dikirim otomatis begitu pembayaran dinyatakan lunas.',
-        '',
-        'Terima kasih 🙏',
-    ].join('\n');
-}
-
 /**
  * Isi akun setelah pesanan selesai (dikirim otomatis oleh poller).
  */

@@ -150,8 +150,8 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   diterima sebagai kompatibilitas (`pilihProdukNomor()`, indeks `state.varian`).
   Baris/urutan yang dirender dan daftar sumber sama-sama berasal dari
   `batasiKatalog()``; ada test yang mencocokkan urutan nama di teks pesan.
-- **Alur bot sederhana: pilih produk → QRIS → kirim bukti → admin verifikasi →
-  bot kirim isi akun.** Bot TIDAK menanyakan nama/konfirmasi; nama diambil dari
+- **Alur bot sederhana: pilih produk → QRIS → kirim bukti (bot diam) → admin
+  `proses`/`done` → bot kirim isi akun.** Bot TIDAK menanyakan nama/konfirmasi; nama diambil dari
   nama tampilan WhatsApp (`msg._data.notifyName`), fallback "Pembeli". Hanya
   varian dengan `required_fields` yang masih ditanya (`STATE.DATA`). Jangan
   menambah langkah tanya/konfirmasi baru tanpa alasan.
@@ -182,10 +182,15 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   `nomorDariKontak()` (`core/wa-filter.js`, ada test regresinya).
 - **Identitas pembeli di grup = pengirim (`msg.author`)**, bukan ID grup;
   balasan tetap dikirim ke chat asal (`msg.from`).
-- **Bukti transfer:** gambar apa pun atau teks berisi "bukti"/"transfer"/"sudah
-  transfer" dianggap bukti; bot hanya mengonfirmasi, tidak memverifikasi.
-  Periksa urutan di `route()`: bukti harus diproses SEBELUM pencarian, kalau
-  tidak "sudah transfer" dianggap nama produk.
+- **Bukti transfer TIDAK dibalas bot.** Gambar apa pun atau teks berisi
+  "bukti"/"transfer"/"tf"/"sudah transfer" dikenali sebagai bukti dan bot
+  mengembalikan `{ replies: [], bukti: true }` — diam total, termasuk kalau
+  pesanannya tidak ditemukan (dulu bot menjawab "saya tidak menemukan pesanan
+  yang menunggu pembayaran…", itu hanya menambah bising). Verifikasi manual oleh
+  admin, lalu pembeli dikabari lewat `proses`/`done`. Periksa urutan di
+  `route()`: bukti harus diperiksa SEBELUM pencarian, kalau tidak "sudah
+  transfer" dianggap nama produk. Jangan kembalikan balasan ke pembeli di jalur
+  ini.
 - **Chrome harus 146.** Chrome lebih baru (termasuk Flatpak) membuat inject
   gagal (`Execution context was destroyed`). Pasang via `@puppeteer/browsers`.
 

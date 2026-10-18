@@ -291,8 +291,10 @@ async function notifikasiTransaksi(aksi, ctx) {
 async function route(aksi, state, chatId, nomor, ctx) {
     // ---------------------------------------------------------- bukti transfer
     // Gambar selalu dianggap bukti transfer, apa pun teksnya (bisa kosong).
+    // Bot TIDAK membalas: verifikasi pembayaran dilakukan admin secara manual,
+    // dan pembeli baru mendengar kabar lewat perintah admin `proses`/`done`.
     if (ctx.hasMedia) {
-        return buktiTransfer(nomor);
+        return { replies: [], bukti: true };
     }
 
     // ---------------------------------------------------------------- global
@@ -413,9 +415,11 @@ async function route(aksi, state, chatId, nomor, ctx) {
     }
 
     // ---------------------------------------------------------- bukti transfer
-    // Diperiksa sebelum pencarian: "sudah transfer" bukan nama produk.
+    // Diperiksa sebelum pencarian: "sudah transfer" bukan nama produk. Sama
+    // seperti gambar, pesan ini TIDAK dibalas bot — admin yang mengabari
+    // pembeli lewat `proses`/`done` setelah mengecek pembayaran.
     if (isBukti(ctx, aksi)) {
-        return buktiTransfer(nomor);
+        return { replies: [], bukti: true };
     }
 
     // -------------------------------------------------------------- pencarian
@@ -601,28 +605,6 @@ async function buatPesanan(state, chatId, nomor, ctx) {
         order: hasil.order,
         payment: hasil.payment,
     };
-}
-
-/**
- * Pembeli mengirim bukti transfer.
- *
- * Bot tidak bisa memverifikasi pembayaran (butuh akses rekening), jadi bot
- * cukup mengonfirmasi penerimaan dan mengarahkan ke admin. Verifikasi tetap
- * dilakukan admin di panel.
- */
-async function buktiTransfer(nomor) {
-    let adaPesanan = false;
-
-    try {
-        const { orders } = await api.orderHistory(nomor);
-        adaPesanan = (orders || []).some((o) => o.can_pay && !o.is_paid);
-    } catch {
-        // API tidak bisa dihubungi: tetap anggap ada pesanan supaya pembeli
-        // tidak salah tingkah.
-        adaPesanan = true;
-    }
-
-    return { replies: [R.buktiDiterima(adaPesanan)] };
 }
 
 async function cekInvoice(invoice, nomor) {

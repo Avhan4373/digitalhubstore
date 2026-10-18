@@ -2,8 +2,8 @@
  * Uji alur percakapan end-to-end dengan API tiruan.
  *
  * Alur sederhana yang diuji:
- *   list -> nomor produk -> nomor paket -> pesanan dibuat + QRIS
- *   kirim bukti -> dikonfirmasi -> admin verifikasi -> isi akun dikirim
+ *   list -> nama produk -> nama paket -> pesanan dibuat + QRIS
+ *   kirim bukti (bot diam) -> admin `proses`/`done` -> isi akun dikirim
  *
  * Tidak butuh Chrome: `fetch` diganti stub.
  */
@@ -402,25 +402,34 @@ test('pencarian tanpa hasil memberi saran', async () => {
 
 // ---------------------------------------------------------------- bukti transfer
 
-test('kirim bukti transfer (gambar) dikonfirmasi', async () => {
+test('kirim bukti transfer (gambar): bot DIAM, tidak ada balasan', async () => {
     await kirim('list');
     await kirim('1');
     await kirim('1');
 
-    const { replies } = await kirim('', { hasMedia: true });
+    panggilan = [];
+    const hasil = await kirim('', { hasMedia: true });
 
-    assert.match(replies[0], /Bukti transfer diterima/);
-    assert.ok(panggilan.some((p) => p.path === '/api/bot/pesanan/riwayat'));
+    assert.deepEqual(hasil.replies, [], 'tidak boleh ada balasan apa pun');
+    assert.equal(hasil.bukti, true);
+    assert.equal(
+        panggilan.length,
+        0,
+        'bot tidak perlu menanyakan pesanan ke API — admin yang mengecek manual',
+    );
 });
 
-test('kirim bukti transfer (teks) dikonfirmasi', async () => {
+test('kirim bukti transfer (teks): bot DIAM, tidak ada balasan', async () => {
     await kirim('list');
     await kirim('1');
     await kirim('1');
 
-    const { replies } = await kirim('sudah transfer');
+    for (const teks of ['sudah transfer', 'bukti tf', 'ini screenshotnya']) {
+        const hasil = await kirim(teks);
 
-    assert.match(replies[0], /Bukti transfer diterima/);
+        assert.deepEqual(hasil.replies, [], `"${teks}" tidak boleh dibalas`);
+        assert.equal(hasil.bukti, true, teks);
+    }
 });
 
 // ------------------------------------------------------------------ pesanan
