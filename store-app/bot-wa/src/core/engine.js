@@ -429,9 +429,9 @@ async function route(aksi, state, chatId, nomor, ctx) {
     // Dikirim sebagai SATU pesan: gambar QRIS dengan teksnya sebagai caption,
     // supaya kalimat "QRIS diatas" menunjuk ke gambar di pesan itu sendiri.
     if (aksi.type === 'pay') {
-        // Validasi: `pay` hanya untuk pembeli yang benar-benar sudah membuat
-        // pesanan. State percakapan tidak bisa dipakai sebagai bukti (lihat
-        // `punyaPesananAktif()`), jadi tanyakan ke server.
+        // Validasi: `pay` hanya mengirim QRIS resmi kalau nomor ini benar-benar
+        // sudah punya pesanan. State percakapan tidak bisa dipakai sebagai bukti
+        // (lihat `punyaPesananAktif()`), jadi tanyakan ke server.
         //
         // `null` = nomor belum bisa dipetakan ke nomor HP / API gagal. Dalam
         // kasus itu bot tidak memblokir: info pembayaran resmi memang publik
@@ -442,7 +442,24 @@ async function route(aksi, state, chatId, nomor, ctx) {
         const sudahOrder = ctx.admin ? true : await punyaPesananAktif(nomor);
 
         if (sudahOrder === false) {
-            return { replies: [R.mintaPilihProdukDulu()] };
+            // Belum ada pesanan. Pesannya HARUS sesuai posisi percakapan:
+            // pembeli yang baru melihat daftar paket Netflix tidak boleh
+            // disuruh "ketik list" — itu memutar balik percakapannya sendiri.
+            // Yang kurang dari mereka cuma satu langkah: memilih paket.
+            switch (state?.tahap) {
+                case STATE.DETAIL:
+                    return { replies: [R.pilihPaketDulu(state.produk, state.varian)] };
+
+                case STATE.PILIH_CARI:
+                    return { replies: [R.pilihProdukDulu()] };
+
+                case STATE.DATA:
+                case STATE.NOMOR:
+                    return { replies: [R.selesaikanPesananDulu()] };
+
+                default:
+                    return { replies: [R.mintaPilihProdukDulu()] };
+            }
         }
 
         clearState(chatId);

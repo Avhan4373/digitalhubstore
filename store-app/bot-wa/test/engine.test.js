@@ -440,6 +440,31 @@ test("pay saat baru buka detail produk tetap ditolak", async () => {
     assert.match(hasil.replies[0], /Belum ada pesanan di nomor ini/);
 });
 
+// Regression: pembeli yang SUDAH membuka daftar paket (mis. "netflix") lalu
+// mengetik `pay` tidak boleh disuruh "ketik list" — itu memutar balik
+// percakapannya sendiri. Yang kurang hanya memilih paket.
+test("pay saat sudah melihat daftar paket: tampilkan ulang paketnya", async () => {
+    stubFetch((path) => {
+        if (path === '/api/bot/katalog') return KATALOG;
+        if (path === '/api/bot/produk/netflix') return { ...DETAIL, product: { ...DETAIL.product, slug: 'netflix', name: 'Netflix' } };
+        if (path === '/api/bot/pesanan/riwayat') return { orders: [] };
+        return null;
+    });
+    engine.resetRateLimit('628111000114');
+
+    await engine.handlePesan({ teks: 'netflix', nomor: '628111000114', chatId: 'dm-netflix', nama: 'Pembeli' });
+    const hasil = await engine.handlePesan({ teks: 'pay', nomor: '628111000114', chatId: 'dm-netflix', nama: 'Pembeli' });
+
+    const teks = hasil.replies[0];
+
+    assert.equal(hasil.qris, undefined, 'QRIS tidak boleh dikirim sebelum ada pesanan');
+    assert.match(teks, /Pesanan belum dibuat/);
+    assert.match(teks, /NETFLIX/);
+    assert.match(teks, /Balas nama paketnya/);
+    // Tidak boleh menyuruh memulai dari awal.
+    assert.doesNotMatch(teks, /Ketik \*list\*/);
+});
+
 // Admin tidak pernah membuat pesanan tapi tetap butuh QRIS/nomor resmi.
 test("pay dari admin tetap mengirim QRIS resmi", async () => {
     stubFetch((path) => (path === "/api/bot/pesanan/riwayat" ? { orders: [] } : null));
