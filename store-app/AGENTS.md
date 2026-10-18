@@ -190,8 +190,14 @@ memanggil `routes/api.php` (`/api/bot/*`, middleware `bot.token`). Aturan yang
   ADMIN: `beritahuBukti()` di `src/index.js` mengirim DM ke setiap
   `BOT_ADMIN_NUMBERS` (nama, nomor pengirim apa adanya, grup/DM, pesanan terakhir
   bila ada, ajakan balas `proses`/`done`) **beserta gambarnya**: adapter
-  mengunduh media pesan masuk di `mediaBukti()` (hanya `image/*`, maks ±6 MB —
-  `msg.downloadMedia()` mengembalikan `MessageMedia`) lalu `beritahuBukti()`
+  mengunduh media pesan masuk lewat `unduhMediaPesan()` — **JANGAN pakai
+  `msg.downloadMedia()` bawaan library**: di v1.34.7 pemanggilan internalnya
+  (`WAWebDownloadManager.downloadAndMaybeDecrypt`) tidak mengirim `mimetype`,
+  sehingga WhatsApp Web menolak dengan `Unexpected mimetype
+  application/octet-stream for media type image` (menyeberang puppeteer jadi
+  error minified `r`, pernah membuat gambar bukti tidak terkirim). Fungsi bot
+  mengirim `mimetype: msg.mimetype` dan mengembalikan `{mimetype, data:
+  base64, filename}`. Hanya `image/*` dan maks ±6 MB. `beritahuBukti()` lalu
   memakainya sebagai satu pesan gambar + caption; `mediaDari()` di adapter
   menerima `MessageMedia`/`{mimetype,data}` selain URL & berkas lokal. Kalau
   gambarnya tidak bisa diunduh/dikirim, notifikasi teks tetap dikirim. Teksnya

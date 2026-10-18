@@ -60,6 +60,13 @@ sebagai dokumen); video/audio dan gambar > ±6 MB tidak diunduh — admin tetap
 dapat keterangannya saja. Kalau unduhan gambar gagal, notifikasi teks tetap
 dikirim, jadi admin tidak pernah kehilangan informasi bukti masuk.
 
+> Catatan teknis: unduhan **tidak** memakai `msg.downloadMedia()` bawaan
+> whatsapp-web.js v1.34.7 — di versi itu pemanggilan internal
+> `WAWebDownloadManager.downloadAndMaybeDecrypt` tidak menyertakan `mimetype`
+> dan ditolak WhatsApp Web (`Unexpected mimetype application/octet-stream for
+> media type image`). Bot memakai `unduhMediaPesan()` di adapter yang mengirim
+> `mimetype` (terbukti berhasil; lihat `uji-unduh.mjs`).
+
 Verifikasi pembayaran memang manual: admin mengecek di panel, lalu mengabari
 pembeli lewat perintah `proses`/`done` (lihat bawah).
 

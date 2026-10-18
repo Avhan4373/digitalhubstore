@@ -185,20 +185,79 @@ async function mediaDari(jalurAtauUrl) {
 }
 
 /**
+ * Unduh media satu pesan (gambar) dari WhatsApp Web jadi `{mimetype, data}`.
+ *
+ * TIDAK memakai `msg.downloadMedia()` whatsapp-web.js v1.34.7: di versi itu
+ * pemanggilan `WAWebDownloadManager.downloadAndMaybeDecrypt` tidak menyertakan
+ * `mimetype`, sehingga WhatsApp Web menolak dengan
+ * `Unexpected mimetype application/octet-stream for media type image`
+ * (gejalanya di bot ini: "Bukti gambar gagal diunduh (r)" — error minified yang
+ * menyeberang batas puppeteer). Menambahkan `mimetype` membuat unduhan berhasil
+ * — dibuktikan lewat `uji-unduh.mjs` (ArrayBuffer 87.588 byte untuk gambar uji).
+ *
+ * @param {import('whatsapp-web.js').Client} client
+ * @param {string} pesanId kunci store pesan (`id._serialized` atau `id.$1`)
+ * @returns {Promise<{mimetype: string, data: string, filename: string}|null>}
+ */
+export async function unduhMediaPesan(client, pesanId) {
+    if (!pesanId) return null;
+
+    return client.pupPage.evaluate(async (msgId) => {
+        const Msg = window.require('WAWebCollections').Msg;
+        const unduh = window.require('WAWebDownloadManager').downloadManager;
+        const msg = Msg.get(msgId);
+
+        if (!msg?.mediaData || msg.mediaData.mediaStage === 'REUPLOADING') return null;
+
+        // Belum terunduh: minta WhatsApp Web mengambilnya dulu.
+        if (msg.mediaData.mediaStage !== 'RESOLVED') {
+            await msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
+        }
+
+        if (msg.mediaData.mediaStage.includes('ERROR')) return null;
+
+        const buf = await unduh.downloadAndMaybeDecrypt({
+            directPath: msg.directPath,
+            encFilehash: msg.encFilehash,
+            filehash: msg.filehash,
+            mediaKey: msg.mediaKey,
+            mediaKeyTimestamp: msg.mediaKeyTimestamp,
+            // WAJIB: tanpa ini WhatsApp Web menolak berkasnya (lihat komentar
+            // fungsi di atas).
+            mimetype: msg.mimetype,
+            type: msg.type,
+            signal: new AbortController().signal,
+            // QPL palsu: cukup supaya API internal tidak melempar karena
+            // objek telemetri kosong.
+            downloadQpl: {
+                addAnnotations() { return this; },
+                addPoint() { return this; },
+            },
+        });
+
+        return {
+            data: await window.WWebJS.arrayBufferToBase64Async(buf),
+            mimetype: msg.mimetype,
+            filename: msg.filename || 'bukti.jpg',
+        };
+    }, pesanId);
+}
+
+/**
  * Unduh media pesan masuk supaya bisa diteruskan ke admin (bukti transfer).
  *
  * Hanya gambar yang diambil: video/dokumen besar tidak layak diteruskan
  * otomatis — untuk kasus itu admin tetap dapat notifikasi teksnya saja.
  * Mengembalikan `null` kalau bukan gambar atau unduhannya gagal.
  */
-async function mediaBukti(msg) {
+async function mediaBukti(msg, client) {
     const mime = String(msg?._data?.mimetype || '');
     const jenis = String(msg?.type || '');
 
     if (jenis !== 'image' && !mime.startsWith('image/')) return null;
 
     try {
-        const media = await msg.downloadMedia();
+        const media = await unduhMediaPesan(client, msg.id?._serialized || msg.id?.$1);
 
         if (!media?.data) return null;
 
@@ -623,7 +682,7 @@ export function buatAdapterWhatsApp(handler) {
         // Bukti transfer: gambarnya diteruskan ke admin (lihat beritahuBukti()
         // di src/index.js). Unduhan dilakukan di sini karena hanya adapter yang
         // menyentuh WhatsApp; `null` = bukan gambar/gagal unduh.
-        const buktiGambar = hasMedia ? await mediaBukti(msg) : null;
+        const buktiGambar = hasMedia ? await mediaBukti(msg, client) : null;
         const dariGrup = String(chatId).includes('@g.us');
 
         // Nama grup (dipakai balasan ADMIN "TRANSAKSI ...": baris 📂 Grup).
