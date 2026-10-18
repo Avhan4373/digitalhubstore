@@ -41,12 +41,18 @@ function catatPesanan(chatId, invoice) {
  * Kirim balasan engine ke pembeli.
  *
  * Teks dipecah supaya katalog panjang tidak menjadi satu pesan raksasa, dan
- * gambar QRIS dikirim terpisah setelah ringkasan pesanan.
+ * gambar QRIS dikirim terpisah setelah ringkasan pesanan. Potongan PERTAMA
+ * dikirim sebagai reply/quote ke pesan pembeli (jika ID-nya tersedia) supaya
+ * di grup terlihat jelas pertanyaan mana yang diberi jawaban.
  */
-async function kirimHasil(sendTo, hasil) {
+async function kirimHasil(sendTo, hasil, balasId = null) {
+    let potonganPertama = true;
+
     for (const teks of hasil.replies || []) {
         for (const potongan of pecahPesan(teks)) {
-            await adapter.kirim(sendTo, potongan);
+            const opsi = potonganPertama && balasId ? { balasId } : {};
+            await adapter.kirim(sendTo, potongan, opsi);
+            potonganPertama = false;
         }
     }
 
@@ -95,7 +101,7 @@ async function beritahuAdmin(order) {
     }
 }
 
-async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia }) {
+async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId }) {
     // Allowlist: kalau diisi, hanya nomor itu yang dilayani. Berguna saat
     // mencoba bot di produksi tanpa mengganggu pembeli sungguhan.
     if (config.allowlist.length > 0 && !config.allowlist.includes(nomor)) {
@@ -117,7 +123,10 @@ async function tanganiPesan({ teks, chatId, nomor, sendTo, nama, hasMedia }) {
 
         if (hasil.order) catatPesanan(chatId, hasil.order.invoice);
 
-        await kirimHasil(tujuan, hasil);
+        // Quote hanya ke pesan yang memilih produk kalau tujuan = chat asal
+        // (di chat @lid tujuan bisa JID nomor HP; cross-chat quote bisa gagal,
+        // tapi kirimTeks sudah punya fallback tanpa quote).
+        await kirimHasil(tujuan, hasil, pesanId);
     } catch (e) {
         // Jangan biarkan satu pesan yang gagal mematikan proses bot atau
         // meninggalkan pembeli tanpa balasan.

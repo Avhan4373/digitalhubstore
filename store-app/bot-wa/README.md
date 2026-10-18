@@ -35,7 +35,8 @@ mengarang data.
 
 Bot **tidak** menanyakan nama atau konfirmasi: begitu paket dipilih, pesanan
 langsung dibuat dan QRIS langsung terkirim. Nama pembeli diambil dari nama
-tampilan WhatsApp.
+tampilan WhatsApp. Balasan pertama bot dikirim sebagai **reply/quote** ke pesan
+pembeli (terutama terlihat di grup), sisanya pesan biasa.
 
 Hanya varian yang benar-benar butuh data (mis. "Email Canva") yang masih
 ditanyakan sebelum pesanan dibuat.

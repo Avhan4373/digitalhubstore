@@ -257,11 +257,15 @@ export function buatAdapterWhatsApp(handler) {
     /**
      * Kirim teks dengan retry saat WA Web sedang reload.
      * `Execution context was destroyed` / `detached Frame` bersifat sementara.
+     * `opsi.balasId` (opsional) membuat pesan jadi reply/quote ke pesan
+     * pembeli; kalau kirim dengan quote gagal, percobaan berikutnya lepas
+     * quote supaya balasan tetap sampai.
      */
-    async function kirimTeks(chatId, teks) {
+    async function kirimTeks(chatId, teks, opsi = {}) {
         for (let i = 0; i < 3; i += 1) {
             try {
-                await client.sendMessage(chatId, teks);
+                const kirimOpsi = i === 0 && opsi.balasId ? { quotedMessageId: opsi.balasId } : undefined;
+                await client.sendMessage(chatId, teks, kirimOpsi);
                 log.debug(`Terkirim ke ${maskNumber(nomorDariChatId(chatId))} (${teks.length} karakter)`);
                 return true;
             } catch (e) {
@@ -349,11 +353,14 @@ export function buatAdapterWhatsApp(handler) {
         const nama = String(msg._data?.notifyName || msg._data?.verifiedName || '').slice(0, 80);
         const hasMedia = Boolean(msg.hasMedia);
         const dariGrup = String(chatId).includes('@g.us');
+        // ID pesan pembeli: dipakai agar balasan pertama menjadi reply/quote
+        // ke pesan ini, bukan pesan terpisah.
+        const pesanId = msg.id?._serialized || null;
 
         // Satu pesan error tidak boleh mematikan proses bot.
         try {
             log.info(`Pesan masuk dari ${maskNumber(nomor)}${lid ? ` (lid ${maskNumber(lid)})` : ''}${dariGrup ? ' [grup]' : ''}${hasMedia ? ' [gambar]' : ''}: ${teks.slice(0, 60)}`);
-            await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia });
+            await handler.onMessage({ teks, chatId, nomor, sendTo, nama, hasMedia, pesanId });
         } catch (e) {
             log.error(`Handler pesan gagal: ${e.message}`);
         }
@@ -364,10 +371,10 @@ export function buatAdapterWhatsApp(handler) {
 
         mulai: () => client.initialize(),
 
-        async kirim(chatId, teks) {
+        async kirim(chatId, teks, opsi = {}) {
             const tujuan = sendToPerChat.get(chatId) || chatId;
 
-            return antre(chatId, () => kirimTeks(tujuan, teks));
+            return antre(chatId, () => kirimTeks(tujuan, teks, opsi));
         },
 
         async kirimMedia(chatId, url, caption) {
