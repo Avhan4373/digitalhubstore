@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\MerenderBarisProduk;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Product;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class VariantController extends Controller
 {
+    use MerenderBarisProduk;
+
     public function store(Request $request, Product $product)
     {
         $data = $this->validated($request);
@@ -40,7 +43,56 @@ class VariantController extends Controller
             'price' => $variant->price,
         ]);
 
+        // Form varian di halaman edit: cukup tukar ringkasannya (badge harga,
+        // status, stok, margin, supplier) lewat jawaban ini.
+        if ($request->wantsJson()) {
+            $variant->loadCount(['stockItems as available_count' => fn ($s) => $s->available()]);
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Varian "'.$variant->name.'" diperbarui.',
+                'summary' => view('admin.variants._summary', ['variant' => $variant])->render(),
+            ]);
+        }
+
         return back()->with('success', 'Varian diperbarui.');
+    }
+
+    /**
+     * Ubah cepat dari daftar produk: harga jual & status aktif saja.
+     *
+     * Kolom lain (mode kirim, supplier, data wajib) sengaja tidak disentuh —
+     * form lengkapnya tetap di halaman edit produk. Harga varian yang sudah
+     * dibeli boleh berubah karena `order_items` menyimpan salinan harga.
+     */
+    public function quick(Request $request, Variant $variant)
+    {
+        $data = $request->validate([
+            'price' => ['required', 'integer', 'min:0', 'max:999999999'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $variant->update([
+            'price' => $data['price'],
+            'is_active' => $request->boolean('is_active'),
+        ]);
+
+        ActivityLog::record('variant.updated', 'Varian "'.$variant->name.'" diperbarui cepat', $variant, [
+            'price' => $variant->price,
+            'is_active' => $variant->is_active,
+        ]);
+
+        $pesan = 'Varian "'.$variant->name.'" disimpan.';
+
+        // Aksi cepat dari daftar produk: halaman menukar baris produknya tanpa
+        // reload, jadi panel "Kelola varian" yang terbuka tetap terbuka.
+        if ($request->wantsJson()) {
+            $product = Product::withTrashed()->findOrFail($variant->product_id);
+
+            return $this->jawabBarisProduk($product, $pesan, $product->trashed());
+        }
+
+        return back()->with('success', $pesan);
     }
 
     public function destroy(Variant $variant)

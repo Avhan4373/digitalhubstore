@@ -15,6 +15,7 @@ import {
     Bell,
     BellRing,
     Bot,
+    Boxes,
     Camera,
     Check,
     CheckCircle2,
@@ -25,6 +26,8 @@ import {
     Copy,
     Download,
     ExternalLink,
+    Eye,
+    EyeOff,
     FileText,
     Filter,
     Flame,
@@ -48,6 +51,7 @@ import {
     Minus,
     Monitor,
     Package,
+    Pencil,
     Phone,
     PlaySquare,
     Plus,
@@ -55,6 +59,7 @@ import {
     QrCode,
     Receipt,
     RefreshCw,
+    RotateCcw,
     ScrollText,
     Search,
     SearchX,
@@ -87,6 +92,7 @@ const ICONS = {
     Bell,
     BellRing,
     Bot,
+    Boxes,
     Camera,
     Check,
     CheckCircle2,
@@ -97,6 +103,8 @@ const ICONS = {
     Copy,
     Download,
     ExternalLink,
+    Eye,
+    EyeOff,
     FileText,
     Filter,
     Flame,
@@ -120,6 +128,7 @@ const ICONS = {
     Minus,
     Monitor,
     Package,
+    Pencil,
     Phone,
     PlaySquare,
     Plus,
@@ -127,6 +136,7 @@ const ICONS = {
     QrCode,
     Receipt,
     RefreshCw,
+    RotateCcw,
     ScrollText,
     Search,
     SearchX,
@@ -277,6 +287,271 @@ function initConfirm() {
         if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
 
         if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+    });
+}
+
+/**
+ * Panel "Kelola varian" di daftar produk.
+ *
+ * Panel disimpan sebagai `<details>`; tanpa JavaScript (atau kalau aksi cepat
+ * gagal dan halaman terpaksa dimuat ulang) panel yang sedang dibuka perlu
+ * dibuka kembali — kalau tidak, admin harus mengklik ulang produk yang sama
+ * setiap kali menyimpan. Posisi panel disimpan di sessionStorage (per tab,
+ * bukan lintas perangkat).
+ *
+ * Dengan JavaScript normal, menyimpan tidak lagi memuat ulang halaman
+ * (`initAjaxForms()`), jadi panel memang tetap terbuka.
+ */
+function initAdminVariantPanels() {
+    const panels = document.querySelectorAll('[data-variant-panel]');
+    if (!panels.length) return;
+
+    const kunci = 'admin.variant-panel';
+    const simpan = (id, buka) => {
+        try {
+            const daftar = new Set(JSON.parse(sessionStorage.getItem(kunci) || '[]'));
+            buka ? daftar.add(id) : daftar.delete(id);
+            sessionStorage.setItem(kunci, JSON.stringify([...daftar]));
+        } catch {
+            /* penyimpanan diblokir: panel tetap berfungsi, hanya tidak ingat */
+        }
+    };
+
+    let dibuka = [];
+
+    try {
+        dibuka = JSON.parse(sessionStorage.getItem(kunci) || '[]');
+    } catch {
+        dibuka = [];
+    }
+
+    panels.forEach((panel) => {
+        const id = panel.dataset.variantPanel;
+
+        // Hanya buka lagi kalau halaman ini memang hasil dari aksi simpan
+        // (ada pesan sukses) — supaya membuka daftar produk tetap ringkas.
+        if (dibuka.includes(id) && document.querySelector('[data-flash]')) {
+            panel.open = true;
+        }
+
+        panel.addEventListener('toggle', () => simpan(id, panel.open));
+    });
+}
+
+/**
+ * Aksi tulis admin tanpa memuat ulang halaman ("realtime" sederhana).
+ *
+ * Form bertanda `data-ajax` dikirim lewat `fetch` (bukan submit halaman penuh):
+ *
+ * - `data-ajax="row"` — aksi cepat di daftar produk (Sembunyikan/Tampilkan,
+ *   simpan cepat harga & status jual varian, Pulihkan). Jawabannya memuat
+ *   `row`: baris produk yang dirender ulang SERVER (partial Blade yang sama
+ *   dengan halaman daftar). Halaman hanya menukar potongan yang ditandai
+ *   `data-product-identitas` / `-ringkasan` / `-aksi` / `-panel-bar`, plus baris
+ *   varian yang baru disimpan, lalu memperbarui angka tab status. Harga varian
+ *   yang belum disimpan di baris lain tidak ikut tersentuh. Baris yang tidak
+ *   lagi cocok dengan tab status yang sedang dibuka dilepas.
+ * - `data-ajax="product-form"` — form edit produk: toast + segarkan judul
+ *   halaman & pratinjau gambar utama dari jawaban server.
+ * - `data-ajax="variant-form"` — satu varian di halaman edit: ringkasannya
+ *   (badge harga/status/stok/margin/supplier) ditukar dengan render server.
+ *
+ * Tidak ada markup yang disusun di JavaScript dan tidak ada HTML kiriman
+ * pengguna yang disisipkan: semua potongan berasal dari Blade (sudah di-escape
+ * server). Tanpa JavaScript, atau kalau server tidak menjawab JSON, rute tetap
+ * memakai `back()` seperti sebelumnya.
+ *
+ * Listener dipasang di `document` (bukan per form) karena aksi cepat menukar
+ * elemen form-nya sendiri saat baris diperbarui.
+ */
+function initAjaxForms() {
+    const asal = document.querySelector('[data-products-list]');
+    const tabStatus = asal?.dataset.statusTab || '';
+    const tabMasalah = asal?.dataset.masalahTab || '';
+
+    const potonganDari = (html) => new DOMParser().parseFromString(html, 'text/html').body.firstElementChild;
+
+    const ganti = (lama, baru) => {
+        if (lama && baru) lama.replaceWith(baru);
+    };
+
+    /** Angka tab status + pill "tanpa varian aktif" (selalu dirender, hanya disembunyikan). */
+    const perbaruiTab = (counts) => {
+        if (!counts) return;
+
+        document.querySelectorAll('[data-count]').forEach((el) => {
+            const angka = counts[el.dataset.count];
+            if (angka !== undefined) el.textContent = String(angka);
+        });
+
+        const pil = document.querySelector('[data-count-pill="tanpa_varian"]');
+        if (pil) {
+            const ada = Number(counts.tanpa_varian || 0) > 0;
+            pil.classList.toggle('hidden', !ada);
+            pil.classList.toggle('inline-flex', ada);
+        }
+    };
+
+    /** Apakah baris masih pantas tampil di tab status/filter yang sedang dibuka? */
+    const cocokDenganTab = (data) => {
+        const aktif = Boolean(data.is_active);
+        const sampah = Boolean(data.trashed);
+
+        if (tabStatus === 'aktif') return aktif && !sampah;
+        if (tabStatus === 'nonaktif') return !aktif && !sampah;
+        if (tabStatus === 'sampah') return sampah;
+        if (tabMasalah === 'tanpa_varian') return !sampah && aktif && Number(data.aktif_varian || 0) === 0;
+
+        return !sampah; // tab "Semua" tidak memuat produk terhapus
+    };
+
+    const segarkanJumlah = () => {
+        if (!asal) return;
+
+        const sisa = asal.querySelectorAll('[data-product-row]').length;
+        const tampil = document.querySelector('[data-count-shown]');
+        if (tampil) tampil.textContent = String(sisa);
+
+        asal.querySelector('[data-list-empty]')?.classList.toggle('hidden', sisa > 0);
+    };
+
+    const buangBaris = (row) => {
+        row.remove();
+
+        const total = document.querySelector('[data-count-total]');
+        if (total) total.textContent = String(Math.max(0, Number(total.textContent || 0) - 1));
+
+        segarkanJumlah();
+    };
+
+    const perbaruiBaris = (rowLama, data, variantId) => {
+        const rowBaru = potonganDari(data.row || '');
+        if (!rowLama || !rowBaru) return;
+
+        const potongan = [
+            '[data-product-identitas]',
+            '[data-product-ringkasan]',
+            '[data-product-aksi]',
+            '[data-product-panel-bar]',
+        ];
+
+        // Hanya baris varian yang baru disimpan yang ditukar, supaya harga yang
+        // sedang diketik di varian lain tidak ikut hilang.
+        if (variantId) potongan.push(`[data-variant-row="${variantId}"]`);
+
+        potongan.forEach((sel) => ganti(rowLama.querySelector(sel), rowBaru.querySelector(sel)));
+
+        // Simpan keadaan terbaru di elemen baris supaya atributnya tidak basi.
+        rowLama.dataset.productStatus = data.is_active ? '1' : '0';
+        rowLama.dataset.productTrashed = data.trashed ? '1' : '0';
+
+        renderIcons(rowLama);
+    };
+
+    const terapkan = (form, data) => {
+        const jenis = form.dataset.ajax;
+
+        if (jenis === 'row') {
+            const rowLama = form.closest('[data-product-row]');
+            const variantId = form.closest('[data-variant-row]')?.dataset.variantRow || '';
+
+            if (rowLama && data.row) perbaruiBaris(rowLama, data, variantId);
+            perbaruiTab(data.counts);
+
+            if (rowLama && !cocokDenganTab(data)) {
+                buangBaris(rowLama);
+            } else {
+                segarkanJumlah();
+            }
+
+            toast(data.message || 'Tersimpan.');
+            return;
+        }
+
+        if (jenis === 'product-form') {
+            const judul = document.querySelector('[data-page-heading]');
+            if (judul && data.name) judul.textContent = data.name;
+
+            const gambar = document.querySelector('[data-cover-preview]');
+            if (gambar && data.cover_url) {
+                gambar.src = data.cover_url;
+                gambar.classList.remove('hidden');
+                document.querySelector('[data-cover-empty]')?.classList.add('hidden');
+            }
+
+            // Berkas sudah diunggah; kosongkan input supaya tidak terkirim lagi
+            // saat menekan Simpan berikutnya.
+            const input = document.querySelector('[data-cover-input]');
+            if (input) input.value = '';
+
+            toast(data.message || 'Perubahan disimpan.');
+            return;
+        }
+
+        if (jenis === 'variant-form') {
+            const ringkasBaru = potonganDari(data.summary || '');
+            if (ringkasBaru) ganti(form.closest('details')?.querySelector('[data-variant-summary]'), ringkasBaru);
+
+            toast(data.message || 'Varian diperbarui.');
+            return;
+        }
+
+        toast(data.message || 'Tersimpan.');
+    };
+
+    const kirim = async (form) => {
+        const tombol = form.querySelector('button[type="submit"], button:not([type])');
+        if (tombol) {
+            tombol.disabled = true;
+            tombol.classList.add('opacity-60');
+        }
+        form.setAttribute('aria-busy', 'true');
+
+        try {
+            const res = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                },
+            });
+
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                const pesan = data?.message
+                    || Object.values(data?.errors || {}).flat()[0]
+                    || `Gagal menyimpan (kode ${res.status}).`;
+                toast(pesan, 'error');
+                return;
+            }
+
+            terapkan(form, data || {});
+        } catch {
+            toast('Koneksi terputus — perubahan belum tersimpan.', 'error');
+        } finally {
+            form.removeAttribute('aria-busy');
+            // Baris bisa saja sudah ditukar, jadi tombol lama mungkin tidak lagi
+            // terpasang di halaman.
+            if (tombol?.isConnected) {
+                tombol.disabled = false;
+                tombol.classList.remove('opacity-60');
+            }
+        }
+    };
+
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.dataset.ajax) return;
+
+        // `initConfirm()` sudah menangani konfirmasi; hormati pembatalannya.
+        if (event.defaultPrevented) return;
+
+        event.preventDefault();
+        void kirim(form);
     });
 }
 
@@ -809,6 +1084,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initAdminLive();
     initOrderLive();
     initAdminNav();
+    initAdminVariantPanels();
+    initAjaxForms();
 
     document.querySelectorAll('[data-copy]').forEach((btn) => {
         btn.addEventListener('click', () => copyText(btn.dataset.copy));

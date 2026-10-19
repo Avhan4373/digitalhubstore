@@ -16,13 +16,25 @@
         </div>
     @endif
 
-    <form action="{{ $isNew ? route('admin.products.store') : route('admin.products.update', $product) }}"
-          method="POST" enctype="multipart/form-data" class="grid gap-4 lg:grid-cols-3">
-        @csrf
-        @if(! $isNew) @method('PUT') @endif
-
+    {{-- Grid pembungkus. Form produk sengaja hanya membungkus kartu "Data
+         produk": HTML tidak mengizinkan form bersarang, sementara kartu varian
+         di bawahnya berisi banyak form (satu per varian + form tambah varian).
+         Dulu form produk membungkus semuanya, sehingga browser menutupnya lebih
+         awal: tombol "Simpan perubahan" sampai tidak punya form sama sekali dan
+         field produk setelah varian (gambar, SEO, "terjual") tidak ikut
+         terkirim. Kontrol di kolom kanan dihubungkan lewat `form="produk-form"`. --}}
+    <div class="grid gap-4 lg:grid-cols-3">
         <div class="space-y-4 lg:col-span-2">
-            <div class="card-pad space-y-4">
+            <form id="produk-form"
+                  action="{{ $isNew ? route('admin.products.store') : route('admin.products.update', $product) }}"
+                  method="POST" enctype="multipart/form-data" class="card-pad space-y-4"
+                  {{-- Form edit disimpan tanpa memuat ulang halaman; form produk
+                       baru tetap submit biasa karena tujuannya berpindah ke
+                       halaman edit. --}}
+                  @if(! $isNew) data-ajax="product-form" @endif>
+                @csrf
+                @if(! $isNew) @method('PUT') @endif
+
                 <h2 class="text-sm font-bold uppercase tracking-wide text-slate-500">Data produk</h2>
 
                 <div>
@@ -56,7 +68,7 @@
                     <label class="label" for="terms">Syarat &amp; ketentuan</label>
                     <textarea id="terms" name="terms" rows="3" class="field" maxlength="5000">{{ old('terms', $product->terms) }}</textarea>
                 </div>
-            </div>
+            </form>
 
             @unless($isNew)
                 <div class="card-pad">
@@ -67,30 +79,12 @@
 
                     <div class="mt-4 space-y-3">
                         @forelse($variants as $variant)
-                            <details class="rounded-xl ring-1 ring-slate-200" @if($loop->first) open @endif>
-                                <summary class="flex cursor-pointer flex-wrap items-center gap-2 p-3.5">
-                                    <span class="text-sm font-semibold text-slate-800">{{ $variant->name }}</span>
-                                    <span class="badge bg-slate-100 text-slate-600 ring-slate-200">{{ rupiah($variant->price) }}</span>
-                                    <span class="badge {{ $variant->is_active ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-slate-200' }}">
-                                        {{ $variant->is_active ? 'Aktif' : 'Nonaktif' }}
-                                    </span>
-                                    @if($variant->delivery_type === \App\Models\Variant::DELIVERY_AUTO)
-                                        <span class="badge {{ $variant->available_count > 0 ? 'bg-brand-50 text-brand-700 ring-brand-100' : 'bg-rose-50 text-rose-700 ring-rose-100' }}">
-                                            stok {{ $variant->available_count }}
-                                        </span>
-                                    @endif
-                                    @if($variant->cost_price > 0)
-                                        <span class="badge bg-slate-100 text-slate-600 ring-slate-200">margin {{ rupiah($variant->margin()) }}</span>
-                                    @endif
-                                    @if($variant->hasSupplier())
-                                        <span class="badge bg-sky-50 text-sky-700 ring-sky-200">beli di {{ $variant->supplier_name ?: 'supplier' }}</span>
-                                    @endif
-                                    <a href="{{ route('admin.variants.stock', $variant) }}"
-                                       class="ml-auto text-xs font-semibold text-brand-600 hover:underline">Kelola stok &rarr;</a>
-                                </summary>
+                            <details id="varian-{{ $variant->id }}" class="scroll-mt-24 rounded-xl ring-1 ring-slate-200"
+                                     @if($loop->first || request('varian') == $variant->id) open @endif>
+                                @include('admin.variants._summary', ['variant' => $variant])
 
                                 <form action="{{ route('admin.variants.update', $variant) }}" method="POST"
-                                      class="border-t border-slate-100 p-3.5">
+                                      class="border-t border-slate-100 p-3.5" data-ajax="variant-form">
                                     @csrf @method('PUT')
 
                                     <div class="grid gap-3 sm:grid-cols-2">
@@ -209,8 +203,8 @@
                         @endforelse
                     </div>
 
-                    <form action="{{ route('admin.variants.store', $product) }}" method="POST"
-                          class="mt-5 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200">
+                    <form action="{{ route('admin.variants.store', $product) }}" method="POST" id="tambah-varian"
+                          class="mt-5 scroll-mt-24 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200">
                         @csrf
                         <p class="text-sm font-semibold text-slate-700">Tambah varian baru</p>
 
@@ -290,17 +284,17 @@
 
                 <div class="space-y-2">
                     <label class="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $product->is_active))
+                        <input type="checkbox" name="is_active" value="1" form="produk-form" @checked(old('is_active', $product->is_active))
                                class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500">
                         Tampilkan di toko
                     </label>
                     <label class="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" name="is_best_seller" value="1" @checked(old('is_best_seller', $product->is_best_seller))
+                        <input type="checkbox" name="is_best_seller" value="1" form="produk-form" @checked(old('is_best_seller', $product->is_best_seller))
                                class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500">
                         Tandai "Terlaris"
                     </label>
                     <label class="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" name="is_hot" value="1" @checked(old('is_hot', $product->is_hot))
+                        <input type="checkbox" name="is_hot" value="1" form="produk-form" @checked(old('is_hot', $product->is_hot))
                                class="h-4 w-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500">
                         Tandai "Hot"
                     </label>
@@ -309,13 +303,13 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <label class="label" for="sold_count">Terjual (tampilan)</label>
-                        <input id="sold_count" name="sold_count" type="number" min="0" max="10000000"
+                        <input id="sold_count" name="sold_count" type="number" min="0" max="10000000" form="produk-form"
                                value="{{ old('sold_count', $product->sold_count) }}" class="field">
                         <p class="hint">Angka marketing. Aslinya dihitung dari order lunas.</p>
                     </div>
                     <div>
                         <label class="label" for="sort_order">Urutan</label>
-                        <input id="sort_order" name="sort_order" type="number" min="0" value="{{ old('sort_order', $product->sort_order ?? 0) }}" class="field">
+                        <input id="sort_order" name="sort_order" type="number" min="0" form="produk-form" value="{{ old('sort_order', $product->sort_order ?? 0) }}" class="field">
                     </div>
                 </div>
             </div>
@@ -323,13 +317,13 @@
             <div class="card-pad space-y-4">
                 <h2 class="text-sm font-bold uppercase tracking-wide text-slate-500">Gambar utama</h2>
 
-                @if($product->cover_image)
-                    <img src="{{ $product->coverUrl() }}" alt="" class="w-full rounded-xl object-cover ring-1 ring-slate-200">
-                @else
-                    <div class="grid h-32 place-items-center rounded-xl bg-slate-100 text-sm text-slate-400">Belum ada gambar</div>
-                @endif
+                {{-- Pratinjau + elemen kosong selalu ada supaya unggahan tanpa
+                     reload bisa menampilkan gambar baru (lihat initAjaxForms). --}}
+                <img data-cover-preview @if($product->cover_image) src="{{ $product->coverUrl() }}" @endif alt=""
+                     class="w-full rounded-xl object-cover ring-1 ring-slate-200 {{ $product->cover_image ? '' : 'hidden' }}">
+                <div data-cover-empty class="grid h-32 place-items-center rounded-xl bg-slate-100 text-sm text-slate-400 {{ $product->cover_image ? 'hidden' : '' }}">Belum ada gambar</div>
 
-                <input type="file" name="cover" accept="image/*" class="field">
+                <input type="file" name="cover" accept="image/*" class="field" form="produk-form" data-cover-input>
                 <p class="hint">JPG/PNG/WebP maksimal 3 MB. Mengunggah gambar baru akan mengganti yang lama.</p>
             </div>
 
@@ -337,16 +331,16 @@
                 <h2 class="text-sm font-bold uppercase tracking-wide text-slate-500">SEO</h2>
                 <div>
                     <label class="label" for="meta_title">Judul meta</label>
-                    <input id="meta_title" name="meta_title" value="{{ old('meta_title', $product->meta_title) }}" class="field" maxlength="180">
+                    <input id="meta_title" name="meta_title" form="produk-form" value="{{ old('meta_title', $product->meta_title) }}" class="field" maxlength="180">
                 </div>
                 <div>
                     <label class="label" for="meta_description">Deskripsi meta</label>
-                    <textarea id="meta_description" name="meta_description" rows="2" class="field" maxlength="255">{{ old('meta_description', $product->meta_description) }}</textarea>
+                    <textarea id="meta_description" name="meta_description" form="produk-form" rows="2" class="field" maxlength="255">{{ old('meta_description', $product->meta_description) }}</textarea>
                 </div>
             </div>
 
             <div class="card-pad">
-                <button class="btn-primary w-full">{{ $isNew ? 'Buat produk' : 'Simpan perubahan' }}</button>
+                <button class="btn-primary w-full" form="produk-form">{{ $isNew ? 'Buat produk' : 'Simpan perubahan' }}</button>
                 <a href="{{ route('admin.products.index') }}" class="btn-ghost mt-2 w-full">Kembali ke daftar</a>
             </div>
 
@@ -362,5 +356,5 @@
                 </div>
             @endunless
         </div>
-    </form>
+    </div>
 @endsection

@@ -54,6 +54,22 @@ Dokumentasi utama ada di `README.md`. Analisis situs asal ada di
 - **Tidak ada JS inline di Blade.** CSP `script-src 'self'` memblokir semua
   `onsubmit=`/`onclick=` — konfirmasi aksi destruktif admin memakai atribut
   `data-confirm` yang ditangani listener di `app.js` (`initConfirm()`).
+- **Aksi tulis admin tanpa reload** (`initAjaxForms()` di `app.js`): form
+  bertanda `data-ajax` dikirim lewat `fetch`, bukan submit halaman penuh.
+  `data-ajax="row"` (aksi cepat daftar produk: Sembunyikan/Tampilkan, simpan
+  cepat varian, Pulihkan) dijawab JSON berisi `row` — baris yang dirender
+  ULANG oleh server dari partial `admin/products/_row.blade.php` — plus
+  `counts`. Jangan menyusun markup baris di JavaScript: tukar saja potongan
+  bertanda `data-product-identitas` / `-ringkasan` / `-aksi` / `-panel-bar`
+  (dan satu `data-variant-row` yang disimpan) supaya harga yang sedang diketik
+  di varian lain tidak hilang. Aksi cepat juga wajib tetap punya jalur
+  `back()` biasa untuk form tanpa JavaScript.
+- **Form produk tidak boleh membungkus form varian.** HTML menutup `<form>`
+  bersarang lebih awal, sehingga tombol "Simpan perubahan" kehilangan pemilik
+  form dan field setelah varian (gambar utama, SEO, "terjual") tidak terkirim —
+  dulu ini benar-benar terjadi. Form produk hanya membungkus kartu "Data
+  produk"; kontrol di kolom kanan dihubungkan lewat `form="produk-form"`.
+  Dijaga `tests/Feature/Admin/ProductFormStructureTest.php`.
 - **Navigasi admin mobile**: sidebar desktop dan drawer mobile WAJIB memakai
   partial yang sama (`admin/_nav-links.blade.php`, `_sidebar-head`,
   `_sidebar-user`) supaya menu tidak pernah berbeda antar breakpoint. Jangan

@@ -101,12 +101,16 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::post('produk', [AdminProductController::class, 'store'])->name('products.store');
     Route::get('produk/{product}/edit', [AdminProductController::class, 'edit'])->name('products.edit');
     Route::put('produk/{product}', [AdminProductController::class, 'update'])->name('products.update');
+    // Aktif/nonaktif langsung dari daftar produk (tanpa membuka form edit).
+    Route::post('produk/{product}/status', [AdminProductController::class, 'status'])->name('products.status');
     Route::delete('produk/{product}', [AdminProductController::class, 'destroy'])->name('products.destroy');
     Route::post('produk/{id}/pulihkan', [AdminProductController::class, 'restore'])->name('products.restore');
 
     // Varian + stok
     Route::post('produk/{product}/varian', [VariantController::class, 'store'])->name('variants.store');
     Route::put('varian/{variant}', [VariantController::class, 'update'])->name('variants.update');
+    // Ubah harga & status jual langsung dari daftar produk.
+    Route::put('varian/{variant}/cepat', [VariantController::class, 'quick'])->name('variants.quick');
     Route::delete('varian/{variant}', [VariantController::class, 'destroy'])->name('variants.destroy');
     Route::get('varian/{variant}/stok', [VariantController::class, 'stock'])->name('variants.stock');
     Route::post('varian/{variant}/stok', [VariantController::class, 'storeStock'])->name('variants.stock.store');

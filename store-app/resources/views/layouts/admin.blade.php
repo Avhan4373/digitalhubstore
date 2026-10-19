@@ -50,7 +50,7 @@
                     </button>
 
                     <div class="min-w-0">
-                        <h1 class="truncate text-base font-black tracking-tight text-slate-900 sm:text-lg">@yield('heading', 'Dashboard')</h1>
+                        <h1 class="truncate text-base font-black tracking-tight text-slate-900 sm:text-lg" data-page-heading>@yield('heading', 'Dashboard')</h1>
                         @hasSection('subheading')
                             <p class="truncate text-[11px] text-slate-500 sm:text-xs">@yield('subheading')</p>
                         @endif
@@ -106,7 +106,7 @@
 
         @if(session('success') || session('error'))
             <div class="px-4 pt-4 lg:px-6">
-                <div class="rounded-xl px-4 py-3 text-sm font-medium ring-1 {{ session('error') ? 'bg-rose-50 text-rose-800 ring-rose-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200' }}">
+                <div data-flash class="rounded-xl px-4 py-3 text-sm font-medium ring-1 {{ session('error') ? 'bg-rose-50 text-rose-800 ring-rose-200' : 'bg-emerald-50 text-emerald-800 ring-emerald-200' }}">
                     {{ session('error') ?: session('success') }}
                 </div>
             </div>
