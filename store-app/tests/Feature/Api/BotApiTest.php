@@ -150,13 +150,13 @@ class BotApiTest extends TestCase
     public function test_katalog_menyertakan_nomor_owner_dan_qris_untuk_perintah_pay(): void
     {
         $this->buatVarian();
-        Setting::put('owner_numbers', "082243890517\n08214369690");
+        Setting::put('owner_numbers', "082395124106");
         Setting::put('qris_image', 'settings/qris.jpg');
         Setting::put('qris_holder', 'Creative Solutions');
 
         $res = $this->sebagaiBot()->getJson('/api/bot/katalog')->assertOk();
 
-        $this->assertSame(['6282243890517', '628214369690'], $res->json('store.owner_numbers'));
+        $this->assertSame(['6282395124106'], $res->json('store.owner_numbers'));
         $this->assertStringContainsString('settings/qris.jpg', (string) $res->json('store.qris_url'));
         $this->assertSame('Creative Solutions', $res->json('store.qris_holder'));
     }

@@ -122,7 +122,7 @@ export function escapeWa(text) {
 }
 
 /**
- * Nomor untuk ditampilkan ke pembeli: 6282243890517 -> "082243890517".
+ * Nomor untuk ditampilkan ke pembeli: 6282395124106 -> "082395124106".
  * Nomor yang sudah diawali 0 dibiarkan apa adanya.
  */
 export function nomorLokal(number) {

@@ -20,7 +20,7 @@ const KATALOG = {
         name: 'Creative Solutions',
         whatsapp: '6282395124106',
         tagline: 'Akun premium resmi',
-        owner_numbers: ['6282243890517', '628214369690'],
+        owner_numbers: ['6282395124106'],
         qris_url: 'https://toko.test/qris-resmi.jpg',
         qris_holder: 'Creative Solutions',
     },
@@ -384,8 +384,7 @@ test('pay selalu langsung menampilkan QRIS resmi (tanpa syarat pesanan)', async 
     // Teks info pembayaran jadi caption gambar, bukan pesan terpisah.
     assert.deepEqual(hasil.replies, []);
     assert.match(teks, /^PAYMENT RESMI$/m);
-    assert.match(teks, /\* 082243890517/);
-    assert.match(teks, /\* 08214369690/);
+    assert.match(teks, /\* 082395124106/);
     assert.match(teks, /Pay wajib menggunakan QRIS diatas/);
 
     // Gambar QRIS ikut dikirim (berkas lokal `qris.jpeg` atau QRIS pengaturan).
